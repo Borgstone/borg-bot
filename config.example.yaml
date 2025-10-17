@@ -1,0 +1,9 @@
+exchange: kucoin
+symbol: BTC/USDT
+timeframe: 1m
+poll_seconds: 15
+sma_fast: 9
+sma_slow: 21
+fees_bps: 10
+slippage_pct: 0.0005
+starting_cash: 1000

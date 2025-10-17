@@ -1,0 +1,20 @@
+services:
+  borg-bot:
+    build: .
+    image: borg-bot:local
+    container_name: borg-bot
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Europe/Dublin}
+      EXCHANGE: ${EXCHANGE:-kucoin}
+      SYMBOL: ${SYMBOL:-BTC/USDT}
+      TIMEFRAME: ${TIMEFRAME:-1m}
+      POLL_SECONDS: ${POLL_SECONDS:-15}
+      SMA_FAST: ${SMA_FAST:-9}
+      SMA_SLOW: ${SMA_SLOW:-21}
+      FEES_BPS: ${FEES_BPS:-10}
+      SLIPPAGE_PCT: ${SLIPPAGE_PCT:-0.0005}
+      STARTING_CASH: ${STARTING_CASH:-1000}
+    volumes:
+      - ./state:/app/state
+      - ./logs:/app/logs
