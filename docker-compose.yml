@@ -24,7 +24,7 @@ services:
       - /opt/borg/logs:/app/logs
     healthcheck:
       # Healthy if the log file changed in the last 120s (1m service logs frequently)
-      test: ["CMD-SHELL", "[ -s \"$LOG_PATH\" ] && [ $(( $(date +%s) - $(stat -c %Y \"$LOG_PATH\") )) -lt 120 ]"]
+      test: ["CMD-SHELL", "[ -s /app/logs/btcusdt_1m.jsonl ] && [ $(( $(date +%s) - $(stat -c %Y /app/logs/btcusdt_1m.jsonl) )) -lt 120 ]"]
       interval: 60s
       timeout: 5s
       retries: 3
@@ -54,7 +54,7 @@ services:
       - /opt/borg/logs:/app/logs
     healthcheck:
       # 1h service still logs regularly; give it a looser window (10 minutes)
-      test: ["CMD-SHELL", "[ -s \"$LOG_PATH\" ] && [ $(( $(date +%s) - $(stat -c %Y \"$LOG_PATH\") )) -lt 600 ]"]
+      test: ["CMD-SHELL", "[ -s /app/logs/btcusdt_1h.jsonl ] && [ $(( $(date +%s) - $(stat -c %Y /app/logs/btcusdt_1h.jsonl) )) -lt 600 ]"]
       interval: 60s
       timeout: 5s
       retries: 3
@@ -83,7 +83,7 @@ services:
       - /opt/borg/state:/app/state
       - /opt/borg/logs:/app/logs
     healthcheck:
-      test: ["CMD-SHELL", "[ -s \"$LOG_PATH\" ] && [ $(( $(date +%s) - $(stat -c %Y \"$LOG_PATH\") )) -lt 120 ]"]
+      test: ["CMD-SHELL", "[ -s /app/logs/ethusdt_1m.jsonl ] && [ $(( $(date +%s) - $(stat -c %Y /app/logs/ethusdt_1m.jsonl) )) -lt 120 ]"]
       interval: 60s
       timeout: 5s
       retries: 3
@@ -112,7 +112,7 @@ services:
       - /opt/borg/state:/app/state
       - /opt/borg/logs:/app/logs
     healthcheck:
-      test: ["CMD-SHELL", "[ -s \"$LOG_PATH\" ] && [ $(( $(date +%s) - $(stat -c %Y \"$LOG_PATH\") )) -lt 600 ]"]
+      test: ["CMD-SHELL", "[ -s /app/logs/ethusdt_1h.jsonl ] && [ $(( $(date +%s) - $(stat -c %Y /app/logs/ethusdt_1h.jsonl) )) -lt 600 ]"]
       interval: 60s
       timeout: 5s
       retries: 3
