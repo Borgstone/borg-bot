@@ -4,6 +4,7 @@ services:
     image: borg-bot:local
     container_name: borg-btc-1m
     restart: unless-stopped
+    command: ["sh","-lc","sleep 0 && python -m borgbot.app.paper_runner"]
     environment:
       TZ: Europe/Dublin
       EXCHANGE: kucoin
@@ -14,17 +15,27 @@ services:
       FEES_BPS: 10
       SLIPPAGE_PCT: 0.0005
       STARTING_CASH: 1000
+      # polling (keep as-is unless you want to tweak)
+      POLL_SECONDS: 15
       DB_PATH: /app/state/btcusdt_1m.db
       LOG_PATH: /app/logs/btcusdt_1m.jsonl
     volumes:
       - /opt/borg/state:/app/state
       - /opt/borg/logs:/app/logs
+    healthcheck:
+      # Healthy if the log file changed in the last 120s (1m service logs frequently)
+      test: ["CMD-SHELL", "[ -s \"$LOG_PATH\" ] && [ $(( $(date +%s) - $(stat -c %Y \"$LOG_PATH\") )) -lt 120 ]"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   borg-btc-1h:
     build: .
     image: borg-bot:local
     container_name: borg-btc-1h
     restart: unless-stopped
+    command: ["sh","-lc","sleep 5 && python -m borgbot.app.paper_runner"]
     environment:
       TZ: Europe/Dublin
       EXCHANGE: kucoin
@@ -35,17 +46,26 @@ services:
       FEES_BPS: 10
       SLIPPAGE_PCT: 0.0005
       STARTING_CASH: 1000
+      POLL_SECONDS: 15
       DB_PATH: /app/state/btcusdt_1h.db
       LOG_PATH: /app/logs/btcusdt_1h.jsonl
     volumes:
       - /opt/borg/state:/app/state
       - /opt/borg/logs:/app/logs
+    healthcheck:
+      # 1h service still logs regularly; give it a looser window (10 minutes)
+      test: ["CMD-SHELL", "[ -s \"$LOG_PATH\" ] && [ $(( $(date +%s) - $(stat -c %Y \"$LOG_PATH\") )) -lt 600 ]"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   borg-eth-1m:
     build: .
     image: borg-bot:local
     container_name: borg-eth-1m
     restart: unless-stopped
+    command: ["sh","-lc","sleep 10 && python -m borgbot.app.paper_runner"]
     environment:
       TZ: Europe/Dublin
       EXCHANGE: kucoin
@@ -56,17 +76,25 @@ services:
       FEES_BPS: 10
       SLIPPAGE_PCT: 0.0005
       STARTING_CASH: 1000
+      POLL_SECONDS: 15
       DB_PATH: /app/state/ethusdt_1m.db
       LOG_PATH: /app/logs/ethusdt_1m.jsonl
     volumes:
       - /opt/borg/state:/app/state
       - /opt/borg/logs:/app/logs
+    healthcheck:
+      test: ["CMD-SHELL", "[ -s \"$LOG_PATH\" ] && [ $(( $(date +%s) - $(stat -c %Y \"$LOG_PATH\") )) -lt 120 ]"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   borg-eth-1h:
     build: .
     image: borg-bot:local
     container_name: borg-eth-1h
     restart: unless-stopped
+    command: ["sh","-lc","sleep 15 && python -m borgbot.app.paper_runner"]
     environment:
       TZ: Europe/Dublin
       EXCHANGE: kucoin
@@ -77,8 +105,15 @@ services:
       FEES_BPS: 10
       SLIPPAGE_PCT: 0.0005
       STARTING_CASH: 1000
+      POLL_SECONDS: 15
       DB_PATH: /app/state/ethusdt_1h.db
       LOG_PATH: /app/logs/ethusdt_1h.jsonl
     volumes:
       - /opt/borg/state:/app/state
       - /opt/borg/logs:/app/logs
+    healthcheck:
+      test: ["CMD-SHELL", "[ -s \"$LOG_PATH\" ] && [ $(( $(date +%s) - $(stat -c %Y \"$LOG_PATH\") )) -lt 600 ]"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
