@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   borg-btc-1m:
     build: .
@@ -15,15 +17,19 @@ services:
       FEES_BPS: 10
       SLIPPAGE_PCT: 0.0005
       STARTING_CASH: 1000
-      # polling (keep as-is unless you want to tweak)
-      POLL_SECONDS: 15
+      POLL_SECONDS: 15     # raise to 20 if you see 429s on 1m
       DB_PATH: /app/state/btcusdt_1m.db
       LOG_PATH: /app/logs/btcusdt_1m.jsonl
     volumes:
       - /opt/borg/state:/app/state
       - /opt/borg/logs:/app/logs
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    stop_grace_period: 15s
     healthcheck:
-      # Healthy if the log file changed in the last 120s (1m service logs frequently)
       test: ["CMD-SHELL", "[ -s /app/logs/btcusdt_1m.jsonl ] && [ $(( $(date +%s) - $(stat -c %Y /app/logs/btcusdt_1m.jsonl) )) -lt 120 ]"]
       interval: 60s
       timeout: 5s
@@ -52,8 +58,13 @@ services:
     volumes:
       - /opt/borg/state:/app/state
       - /opt/borg/logs:/app/logs
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    stop_grace_period: 15s
     healthcheck:
-      # 1h service still logs regularly; give it a looser window (10 minutes)
       test: ["CMD-SHELL", "[ -s /app/logs/btcusdt_1h.jsonl ] && [ $(( $(date +%s) - $(stat -c %Y /app/logs/btcusdt_1h.jsonl) )) -lt 600 ]"]
       interval: 60s
       timeout: 5s
@@ -76,12 +87,18 @@ services:
       FEES_BPS: 10
       SLIPPAGE_PCT: 0.0005
       STARTING_CASH: 1000
-      POLL_SECONDS: 15
+      POLL_SECONDS: 15     # raise to 20 if you see 429s on 1m
       DB_PATH: /app/state/ethusdt_1m.db
       LOG_PATH: /app/logs/ethusdt_1m.jsonl
     volumes:
       - /opt/borg/state:/app/state
       - /opt/borg/logs:/app/logs
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    stop_grace_period: 15s
     healthcheck:
       test: ["CMD-SHELL", "[ -s /app/logs/ethusdt_1m.jsonl ] && [ $(( $(date +%s) - $(stat -c %Y /app/logs/ethusdt_1m.jsonl) )) -lt 120 ]"]
       interval: 60s
@@ -111,6 +128,12 @@ services:
     volumes:
       - /opt/borg/state:/app/state
       - /opt/borg/logs:/app/logs
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    stop_grace_period: 15s
     healthcheck:
       test: ["CMD-SHELL", "[ -s /app/logs/ethusdt_1h.jsonl ] && [ $(( $(date +%s) - $(stat -c %Y /app/logs/ethusdt_1h.jsonl) )) -lt 600 ]"]
       interval: 60s
