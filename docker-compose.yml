@@ -28,10 +28,10 @@ services:
       retries: 3
       start_period: 60s
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
         max-size: "10m"
-        max-file: "5"
+        max-file: "3"
 
   borg-btc-1h:
     build: .
@@ -62,10 +62,10 @@ services:
       retries: 3
       start_period: 60s
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
         max-size: "10m"
-        max-file: "5"
+        max-file: "3"
 
   borg-eth-1m:
     build: .
@@ -96,10 +96,10 @@ services:
       retries: 3
       start_period: 60s
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
         max-size: "10m"
-        max-file: "5"
+        max-file: "3"
 
   borg-eth-1h:
     build: .
@@ -130,7 +130,7 @@ services:
       retries: 3
       start_period: 60s
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
         max-size: "10m"
-        max-file: "5"
+        max-file: "3"
