@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Robust PnL: no early-exit; per-service rows always printed.
+# Robust PnL: resilient price extraction, DB fallback, ledger replay.
 set -u
 
-# Services we expect (print in this order)
+# Services to report (ordered)
 SERVICES=(borg-btc-1m borg-btc-1h borg-eth-1m borg-eth-1h)
 
 # Map service -> db file
@@ -13,27 +13,28 @@ declare -A DBS=(
   [borg-eth-1h]=ethusdt_1h.db
 )
 
-# Safe runner: never kill the script on failure
+# Run a command safely; never crash the script
 run_safe() { bash -c "$1" 2>/dev/null || true; }
 
-latest_number_from_logs() {
-  local svc="$1" field="$2" since="${3:-365d}"
+# Extract the latest numeric field from logs via regex. Last match wins.
+latest_price_from_logs() {
+  local svc="$1" since="$2"
   run_safe "docker logs --since='$since' '$svc'" \
-    | awk -v f="\"$field\": " '
-        $0 ~ f {
-          split($0, a, f)
-          if (length(a) > 1) { g=a[2]; sub(/[ ,}].*/, "", g); val=g }
+    | awk '
+        {
+          if (match($0, /"price"[[:space:]]*:[[:space:]]*([0-9.]+)/, m)) v=m[1]
         }
-        END { if (val!="") print val }
+        END { if (v != "") print v }
       '
 }
 
+# starting_cash from logs (init.cash), fallback 1000
 starting_cash_from_logs() {
   local svc="$1" since="${2:-365d}"
   run_safe "docker logs --since='$since' '$svc'" \
     | awk '
-        /"event": "init\.cash"/ {
-          if (match($0, /"starting_cash":[ ]*([0-9.]+)/, m)) sc=m[1]
+        /"event":[[:space:]]*"init\.cash"/ {
+          if (match($0, /"starting_cash"[[:space:]]*:[[:space:]]*([0-9.]+)/, m)) sc=m[1]
         }
         END { if (sc!="") print sc }
       '
@@ -43,7 +44,7 @@ echo "timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 printf "%-12s | %-12s %-12s %-12s %-12s %-10s %s\n" "service" "price" "cash" "base" "equity" "PnL" "ROI%"
 
 for svc in "${SERVICES[@]}"; do
-  # Verify container exists; if not, print N/A but keep going
+  # Ensure container exists
   if ! docker inspect "$svc" >/dev/null 2>&1; then
     printf "%-12s | price=%-8s cash=%-10s base=%-12s equity=%-8s PnL=%-8s %s\n" \
       "$svc" "N/A" "N/A" "N/A" "N/A" "N/A" "N/A"
@@ -51,23 +52,34 @@ for svc in "${SERVICES[@]}"; do
   fi
 
   db="${DBS[$svc]:-}"
-  # Price (try logs; fallback N/A->0 for math)
-  price="$(latest_number_from_logs "$svc" price 365d)"
-  price=${price:-0}
 
-  # starting cash from logs; fallback to 1000
-  start_cash="$(starting_cash_from_logs "$svc" 365d)"
-  start_cash=${start_cash:-1000}
+  # 1) Price: try recent logs, then longer; fallback to last trade price
+  price="$(latest_price_from_logs "$svc" 15m)"
+  if [ -z "${price:-}" ]; then price="$(latest_price_from_logs "$svc" 24h)"; fi
+  if [ -z "${price:-}" ]; then price="$(latest_price_from_logs "$svc" 365d)"; fi
 
+  if [ -z "${price:-}" ] && [ -n "$db" ]; then
+    # last trade price fallback
+    price="$(run_safe "docker run --rm -v /opt/borg/state:/state alpine:3 sh -lc \
+      \"apk add --no-cache sqlite >/dev/null; \
+         [ -f /state/$db ] && sqlite3 -readonly /state/$db \
+         'SELECT price FROM trades ORDER BY ts DESC LIMIT 1;'\"")"
+  fi
+
+  # As a final guard, zero if still empty (will show up obviously on report)
+  price="${price:-0}"
+
+  # 2) starting cash from logs (or 1000)
+  start_cash="$(starting_cash_from_logs "$svc" 365d)"; start_cash="${start_cash:-1000}"
+
+  # 3) Rebuild ledger from trades (buy/sell with fees)
   cash="$start_cash"
   base="0"
-
-  # Rebuild ledger from trades table (ignore stored cash_after/base_after)
   if [ -n "$db" ]; then
     run_safe "docker run --rm -v /opt/borg/state:/state alpine:3 sh -lc \
       \"apk add --no-cache sqlite >/dev/null; \
-        [ -f /state/$db ] && sqlite3 -readonly -csv /state/$db \
-        'SELECT side, qty, price, fee FROM trades ORDER BY ts ASC;'\"" \
+         [ -f /state/$db ] && sqlite3 -readonly -csv /state/$db \
+         'SELECT side, qty, price, fee FROM trades ORDER BY ts ASC;'\"" \
       | awk -F, -v c="$cash" '
           BEGIN{ cash=c+0; base=0; have=0 }
           NF>=4 {
@@ -84,15 +96,12 @@ for svc in "${SERVICES[@]}"; do
     rm -f /tmp/.pnl_ledger.$$ || true
   fi
 
-  # Math (protect against empty/NaN)
-  price=${price:-0}
-  cash=${cash:-0}
-  base=${base:-0}
-
-  equity=$(awk -v c="$cash" -v b="$base" -v p="$price" 'BEGIN{printf "%.2f", c + b*p}')
+  # 4) Math
+  equity=$(awk -v c="${cash:-0}" -v b="${base:-0}" -v p="${price:-0}" 'BEGIN{printf "%.2f", c + b*p}')
   pnl=$(awk -v e="$equity" -v s="$start_cash" 'BEGIN{printf "%.2f", e - s}')
   roi=$(awk -v p="$pnl" -v s="$start_cash" 'BEGIN{ if (s==0) printf "0.00"; else printf "%.2f", (p/s)*100 }')
 
+  # Display formatting
   pdisp=$(awk -v p="$price" 'BEGIN{ if (p>=1000) printf "%.1f", p; else printf "%.2f", p }')
 
   printf "%-12s | price=%-8s cash=%-10.2f base=%-12.8f equity=%-8s PnL=%-8s %s%%\n" \
