@@ -45,11 +45,10 @@ starting_cash_from_logs() {
 # last cash/base from DB (one sqlite call)
 db_last_cash_base() {
   local db="$1"
-  docker run --rm -v /opt/borg/state:/state alpine:3 sh -lc \
-    "apk add --no-cache sqlite >/dev/null 2>&1; \
-     [ -f /state/$db ] && sqlite3 -readonly /state/$db \
-       'SELECT cash_after, base_after FROM trades ORDER BY ts DESC LIMIT 1;' 2>/dev/null" \
-    | awk 'NR==1 {print $1, $2}'
+  if [ -f "/opt/borg/state/$db" ]; then
+    sqlite3 -readonly "/opt/borg/state/$db" \
+      'SELECT cash_after, base_after FROM trades ORDER BY ts DESC LIMIT 1;' 2>/dev/null
+  fi
 }
 
 # --- write header if needed ---
