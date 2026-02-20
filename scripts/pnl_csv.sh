@@ -70,15 +70,10 @@ for svc in "${services[@]}"; do
   fi
   price="${price:-0}"
 
-  starting_cash_from_logs() {
-  local svc="$1"
-  docker logs --since="365d" "$svc" 2>/dev/null | awk '
-    /"event": "init\.cash"/ {
-      if (match($0, /"starting_cash":[ ]*([0-9.]+)/, m)) sc=m[1]
-    }
-    END { if (sc!="") print sc }
-  ' || true
-}
+  # 2) starting cash
+  sc="$(starting_cash_from_logs "$svc" || true)"
+  sc="${sc:-1000}"
+
 
 
   # 3) cash/base from DB
