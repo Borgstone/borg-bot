@@ -42,6 +42,7 @@ starting_cash_from_logs() {
 }
 
 
+
 # last cash/base from DB (one sqlite call)
 db_last_cash_base() {
   local db="$1"
