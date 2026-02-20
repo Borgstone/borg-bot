@@ -16,6 +16,12 @@ def paper_trade_once(conn, logger, *, side: str, price: float, fees_bps: float, 
             return
         px = apply_slippage(price, slippage_pct, "buy")
         qty = (notional / px) * (1.0 - fee_rate)
+        if qty <= 0 or notional <= 0: 
+            logger.info("paper.skip_invalid_qty", qty=qty, notional=notional)
+            return
+        if price <= 0:
+            logger.error("paper.invalid_price", price=price)
+            return
         base_qty_after = base_qty + qty
         if base_qty_after > 0: avg_price = ((base_qty * avg_price) + (qty * px)) / (base_qty_after)
         cash_after = cash - notional

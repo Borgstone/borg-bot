@@ -88,7 +88,7 @@ def main():
                     price=price,
                     fees_bps=cfg.fees_bps,
                     slippage_pct=cfg.slippage_pct,
-                    size_frac=cfg.risk.max_position_frac
+                    size_frac=cfg.risk.max_position_frac,
                     min_cash_buffer_frac=cfg.risk.min_cash_buffer_frac,
                 )
 

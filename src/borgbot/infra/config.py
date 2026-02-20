@@ -43,8 +43,9 @@ def _apply_env_overrides(cfg: Dict[str, Any]) -> Dict[str, Any]:
     cfg['starting_cash'] = _to_float(os.environ.get('STARTING_CASH'), cfg.get('starting_cash', 1000.0))
 
     risk = cfg.get('risk', {}) or {}
-    risk['daily_max_loss_pct'] = _to_float(os.environ.get('RISK_DAILY_MAX_LOSS_PCT'),
-                                           risk.get('daily_max_loss_pct', 0.05))
+    risk['daily_max_loss_pct'] = _to_float(os.environ.get('RISK_DAILY_MAX_LOSS_PCT'), risk.get('daily_max_loss_pct', 0.05))
+    risk['max_position_frac'] = _to_float(os.environ.get('RISK_MAX_POSITION_FRAC'), risk.get('max_position_frac', 0.1))
+    risk['min_cash_buffer_frac'] = _to_float(os.environ.get('RISK_MIN_CASH_BUFFER_FRAC'), risk.get('min_cash_buffer_frac', 0.1))
     risk['trading_window']     = os.environ.get('RISK_TRADING_WINDOW', risk.get('trading_window', '00:00-23:59'))
     cfg['risk'] = risk
     return cfg
@@ -55,6 +56,4 @@ def load_config(path: str = "/app/config.yaml") -> Settings:
     cfg = _apply_env_overrides(cfg)
     return Settings.model_validate(cfg)  # Pydantic v2
 
-max_position_frac: float = 0.1  # 10% per trade
-min_cash_buffer_frac: float = 0.1  # keep 10% idle
 
