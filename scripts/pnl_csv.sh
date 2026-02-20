@@ -33,23 +33,24 @@ latest_num_from_logs() {
 # starting cash from the earliest init.cash we can still see in logs; fallback 1000
 starting_cash_from_logs() {
   local svc="$1"
-  docker logs --since="365d" "$svc" 2>/dev/null \
-    | awk '
-        /"event": "init\.cash"/ {
-          if (match($0, /"starting_cash":[ ]*([0-9.]+)/, m)) sc=m[1]
-        }
-        END { if (sc!="") print sc }
-      '
+  docker logs --since="365d" "$svc" 2>/dev/null | awk '
+    /"event": "init\.cash"/ {
+      if (match($0, /"starting_cash":[ ]*([0-9.]+)/, m)) sc=m[1]
+    }
+    END { if (sc!="") print sc }
+  ' || true
 }
+
 
 # last cash/base from DB (one sqlite call)
 db_last_cash_base() {
   local db="$1"
   if [ -f "/opt/borg/state/$db" ]; then
-    sqlite3 -readonly "/opt/borg/state/$db" \
+    sqlite3 "/opt/borg/state/$db" \
       'SELECT cash_after, base_after FROM trades ORDER BY ts DESC LIMIT 1;' 2>/dev/null
   fi
 }
+
 
 # --- write header if needed ---
 if [ ! -f "$CSV_PATH" ] || ! head -n1 "$CSV_PATH" | grep -q '^timestamp,service,price,cash,base,equity,pnl,roi$'; then
@@ -68,9 +69,16 @@ for svc in "${services[@]}"; do
   fi
   price="${price:-0}"
 
-  # 2) starting cash
-  sc="$(starting_cash_from_logs "$svc")"
-  sc="${sc:-1000}"
+  starting_cash_from_logs() {
+  local svc="$1"
+  docker logs --since="365d" "$svc" 2>/dev/null | awk '
+    /"event": "init\.cash"/ {
+      if (match($0, /"starting_cash":[ ]*([0-9.]+)/, m)) sc=m[1]
+    }
+    END { if (sc!="") print sc }
+  ' || true
+}
+
 
   # 3) cash/base from DB
   read -r cash base <<<"$(db_last_cash_base "$db" || true)"
