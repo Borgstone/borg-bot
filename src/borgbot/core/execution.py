@@ -2,14 +2,18 @@ import time
 from borgbot.state.store import get_position, set_position, add_trade
 def apply_slippage(price: float, slippage_pct: float, side: str) -> float:
     return price * (1.0 + slippage_pct) if side == "buy" else price * (1.0 - slippage_pct)
-def paper_trade_once(conn, logger, *, side: str, price: float, fees_bps: float, slippage_pct: float, size_frac: float = 1.0):
+def paper_trade_once(conn, logger, *, side: str, price: float, fees_bps: float, slippage_pct: float, size_frac: float = 1.0, min_cash_buffer_frac: float = 0.0):
     """Long-only paper engine."""
     ts = int(time.time() * 1000)
     base_qty, cash, avg_price = get_position(conn)
     fee_rate = fees_bps / 10_000.0
     if side == "buy":
         if cash <= 0.0: logger.info("paper.skip_no_cash", cash=cash); return
-        notional = cash * size_frac
+        deployable_cash = max(0.0, cash * (1.0 - min_cash_buffer_frac))
+        notional = deployable_cash * size_frac
+        if notional <= 0:
+            logger.info("paper.skip_buffer_protection", cash=cash)
+            return
         px = apply_slippage(price, slippage_pct, "buy")
         qty = (notional / px) * (1.0 - fee_rate)
         base_qty_after = base_qty + qty

@@ -81,8 +81,17 @@ def main():
             # strategy decision on closed candles only
             signal = sma_cross_strategy(closes, SMAConfig(fast=cfg.sma_fast, slow=cfg.sma_slow))
             if signal in ("buy","sell"):
-                paper_trade_once(conn, logger, side=signal, price=price,
-                                 fees_bps=cfg.fees_bps, slippage_pct=cfg.slippage_pct, size_frac=1.0)
+                paper_trade_once(
+                    conn,
+                    logger,
+                    side=signal,
+                    price=price,
+                    fees_bps=cfg.fees_bps,
+                    slippage_pct=cfg.slippage_pct,
+                    size_frac=cfg.risk.max_position_frac
+                    min_cash_buffer_frac=cfg.risk.min_cash_buffer_frac,
+                )
+
             else:
                 logger.info("signal.hold", price=price)
 

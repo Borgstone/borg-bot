@@ -7,6 +7,9 @@ from pydantic import BaseModel, Field
 class RiskConfig(BaseModel):
     daily_max_loss_pct: float = 0.05
     trading_window: str = "00:00-23:59"
+    max_position_frac: float = 0.1  # 10% per trade
+    min_cash_buffer_frac: float = 0.1  # keep 10% idle
+
 
 class Settings(BaseModel):
     exchange: str = "kucoin"
@@ -51,3 +54,7 @@ def load_config(path: str = "/app/config.yaml") -> Settings:
         cfg = yaml.safe_load(f) or {}
     cfg = _apply_env_overrides(cfg)
     return Settings.model_validate(cfg)  # Pydantic v2
+
+max_position_frac: float = 0.1  # 10% per trade
+min_cash_buffer_frac: float = 0.1  # keep 10% idle
+
