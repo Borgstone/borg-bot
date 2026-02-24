@@ -56,7 +56,7 @@ services:
       - /opt/borg/state:/app/state
       - /opt/borg/logs:/app/logs
     healthcheck:
-      test: ["CMD-SHELL", "[ -s /app/logs/btcusdt_1h.jsonl ] && [ $(( $(date +%s) - $(stat -c %Y /app/logs/btcusdt_1h.jsonl) )) -lt 600 ]"]
+      test: ["CMD-SHELL", "[ -s /app/logs/btcusdt_1h.jsonl ] && [ $(( $(date +%s) - $(stat -c %Y /app/logs/btcusdt_1h.jsonl) )) -lt 4200 ]"]
       interval: 60s
       timeout: 5s
       retries: 3
@@ -124,7 +124,7 @@ services:
       - /opt/borg/state:/app/state
       - /opt/borg/logs:/app/logs
     healthcheck:
-      test: ["CMD-SHELL", "[ -s /app/logs/ethusdt_1h.jsonl ] && [ $(( $(date +%s) - $(stat -c %Y /app/logs/ethusdt_1h.jsonl) )) -lt 600 ]"]
+      test: ["CMD-SHELL", "[ -s /app/logs/ethusdt_1h.jsonl ] && [ $(( $(date +%s) - $(stat -c %Y /app/logs/ethusdt_1h.jsonl) )) -lt 4200 ]"]
       interval: 60s
       timeout: 5s
       retries: 3
