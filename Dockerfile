@@ -22,3 +22,6 @@ VOLUME ["/app/state", "/app/logs"]
 ENV PYTHONPATH=/app/src
 
 CMD ["/app/entrypoint.sh"]
+
+RUN mkdir -p /app/logs /app/state
+RUN chown -R 1005:1005 /app
