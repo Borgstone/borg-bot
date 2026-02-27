@@ -7,9 +7,12 @@ from borgbot.infra.config import load_config
 from borgbot.infra.ids import run_id
 from borgbot.adapters.exchange import ExchangeAdapter
 from borgbot.core.strategy import SMAConfig, sma_cross_strategy
-from borgbot.core.execution import paper_trade_once
 from borgbot.core.risk import RiskState, is_in_window, daily_loss_breached
 from borgbot.state.store import connect, get_last_candle_ts, set_last_candle_ts, get_position, set_position
+from borgbot.execution.paper import PaperExecutionAdapter
+from borgbot.core.engine import TradingEngine
+from borgbot.risk.fixed_fraction import FixedFractionSizing
+from borgbot.strategies.stack import StrategyStack
 
 TF_MS = {"1m":60000, "3m":180000, "5m":300000, "15m":900000, "30m":1800000, "1h":3600000}
 
@@ -38,6 +41,24 @@ def main():
     conn = connect()
     ensure_starting_cash(conn, cfg.starting_cash, logger)
     ex = ExchangeAdapter(cfg.exchange)
+    
+    # Temporary simple strategy stub
+    class HoldStrategy:
+        def generate_signal(self, context):
+            return 0.0
+
+    strategy_stack = StrategyStack([(HoldStrategy(), 1.0)])
+    risk_engine = FixedFractionSizing(fraction=0.1)
+
+    execution = PaperExecutionAdapter(
+    conn,
+    logger,
+    fees_bps=cfg.fees_bps,
+    slippage_pct=cfg.slippage_pct,
+    )
+
+    engine = TradingEngine(strategy_stack, risk_engine, execution)
+
 
     # risk day-open state (local time)
     tz = pytz.timezone(os.environ.get("TZ", "Europe/Dublin"))
@@ -78,25 +99,9 @@ def main():
                 set_last_candle_ts(conn, latest_ts); last_ts = latest_ts
                 continue
 
-            # strategy decision on closed candles only
-            signal = sma_cross_strategy(closes, SMAConfig(fast=cfg.sma_fast, slow=cfg.sma_slow))
-            if signal in ("buy","sell"):
-                paper_trade_once(
-                    conn,
-                    logger,
-                    side=signal,
-                    price=price,
-                    fees_bps=cfg.fees_bps,
-                    slippage_pct=cfg.slippage_pct,
-                    size_frac=cfg.risk.max_position_frac,
-                    min_cash_buffer_frac=cfg.risk.min_cash_buffer_frac,
-                )
-
-            else:
-                logger.info("signal.hold", price=price)
-
-            set_last_candle_ts(conn, latest_ts); last_ts = latest_ts
-            sleep_until_next_close(cfg.timeframe, grace_s=2)
+            from borgbot.core.context import MarketContext
+            context = MarketContext(closes)
+            engine.on_new_candle(context, eq, price)
 
         except Exception as e:
             msg = str(e); backoff = 65 if "429" in msg else min(60, cfg.poll_seconds * 2)
