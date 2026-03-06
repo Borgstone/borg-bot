@@ -2,7 +2,7 @@ import os
 import pandas as pd
 
 
-DATA_DIR = "/opt/borg/data"
+DATA_DIR = "/app/data"
 
 
 def _path(symbol: str, timeframe: str):
