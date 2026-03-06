@@ -1,4 +1,15 @@
 services:
+  research:
+    build: .
+    image: borg-bot:local
+    container_name: borg-research
+    volumes:
+      - /opt/borg/state:/app/state
+      - /opt/borg/logs:/app/logs
+      - /opt/borg/data:/app/data
+      - ./src:/app/src
+    working_dir: /app
+    entrypoint: ["python", "-m", "borgbot.backtest.run"]
   borg-btc-1m:
     user: "1005:1005"
     build: .
