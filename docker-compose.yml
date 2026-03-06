@@ -9,6 +9,8 @@ services:
       - /opt/borg/data:/app/data
       - ./src:/app/src
     working_dir: /app
+    environment:
+      - PYTHONPATH=/app/src
     entrypoint: ["python", "-m", "borgbot.backtest.run"]
   borg-btc-1m:
     user: "1005:1005"
