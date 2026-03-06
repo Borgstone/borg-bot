@@ -1,6 +1,5 @@
 import pandas as pd
-from borgbot.engine.trading_engine import TradingEngine
-
+from borgbot.trading.engine import TradingEngine
 
 class BacktestEngine:
 
