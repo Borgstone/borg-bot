@@ -2,7 +2,7 @@ import argparse
 
 from borgbot.data.loader import load_data
 from borgbot.backtest.engine import BacktestEngine
-from borgbot.engine.trading_engine import TradingEngine
+from borgbot.core.engine import TradingEngine
 from borgbot.execution.paper import PaperExecutionAdapter
 from borgbot.risk.fixed_fraction import FixedFractionSizing
 from borgbot.strategy.sma import SMAStrategy
