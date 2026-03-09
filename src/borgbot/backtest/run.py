@@ -27,7 +27,7 @@ def main():
         args.to_date,
     )
 
-    strategy = SMAStrategy(9, 21)
+    strategy = SMAStrategy({"fast": 9, "slow": 21})
 
     risk = FixedFractionSizing(
         max_position_frac=0.1,
