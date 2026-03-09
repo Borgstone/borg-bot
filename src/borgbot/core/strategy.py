@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import List, Literal
+
 class SMAConfig(BaseModel):
     fast: int = Field(9, gt=0)
     slow: int = Field(21, gt=0)

@@ -5,7 +5,8 @@ from borgbot.backtest.engine import BacktestEngine
 from borgbot.core.engine import TradingEngine
 from borgbot.execution.paper import PaperExecutionAdapter
 from borgbot.risk.fixed_fraction import FixedFractionSizing
-from borgbot.strategy.sma import SMAStrategy
+from borgbot.strategies.sma import SMAStrategy
+from borgbot.strategies.rsi import RSIStrategy
 
 
 def main():
