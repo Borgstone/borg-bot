@@ -1,5 +1,5 @@
 import pandas as pd
-from borgbot.trading.engine import TradingEngine
+from borgbot.core.engine import TradingEngine
 
 class BacktestEngine:
 
