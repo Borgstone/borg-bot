@@ -29,10 +29,10 @@ def main():
 
     strategy = SMAStrategy({"fast": 9, "slow": 21})
 
-    risk = FixedFractionSizing(
-        max_position_frac=0.1,
-        min_cash_buffer_frac=0.1,
-    )
+    risk = FixedFractionSizing({
+    "max_position_frac": 0.1,
+    "min_cash_buffer_frac": 0.1
+    })
 
     execution = PaperExecutionAdapter()
 

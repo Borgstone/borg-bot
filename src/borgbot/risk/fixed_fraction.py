@@ -1,10 +1,15 @@
 from borgbot.risk.base import RiskEngine
 
-class FixedFractionSizing(RiskEngine):
-    def __init__(self, fraction: float):
-        self.fraction = fraction
 
-    def calculate_position_size(self, equity: float, price: float, context):
-        if price <= 0:
-            return 0.0
-        return (equity * self.fraction) / price
+class FixedFractionSizing(RiskEngine):
+
+    def __init__(self, config):
+        self.max_position_frac = config.get("max_position_frac", 0.1)
+        self.min_cash_buffer_frac = config.get("min_cash_buffer_frac", 0.1)
+
+    def size_position(self, equity: float, price: float):
+
+        capital = equity * self.max_position_frac
+        qty = capital / price
+
+        return qty
