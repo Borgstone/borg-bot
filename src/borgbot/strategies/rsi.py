@@ -1,27 +1,27 @@
 from borgbot.strategies.base import Strategy
 from borgbot.indicators.rsi import rsi
 
-
 class RSIStrategy(Strategy):
 
-    def __init__(self, period=14, overbought=70, oversold=30):
-        self.period = period
-        self.overbought = overbought
-        self.oversold = oversold
+    def generate_signal(self, context) -> float:
 
-    def generate_signal(self, candles):
+        candles = context["candles"]
 
-        if len(candles) < self.period:
-            return None
+        period = self.config.get("period", 14)
+        overbought = self.config.get("overbought", 70)
+        oversold = self.config.get("oversold", 30)
+
+        if len(candles) < period:
+            return 0.0
 
         closes = [c["close"] for c in candles]
 
-        value = rsi(closes, self.period)
+        value = rsi(closes, period)
 
-        if value < self.oversold:
-            return "buy"
+        if value < oversold:
+            return 1.0
 
-        if value > self.overbought:
-            return "sell"
+        if value > overbought:
+            return -1.0
 
-        return None
+        return 0.0
