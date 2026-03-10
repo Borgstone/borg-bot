@@ -1,21 +1,32 @@
+import os
 import pandas as pd
 from .fetcher import fetch_ohlcv
-from .cache import load_cache, append_cache
 
 
-def load_data(symbol, timeframe, start=None, end=None, exchange="kucoin"):
+def load_data(symbol: str, timeframe: str, start: str, end: str):
 
-    df = load_cache(symbol, timeframe)
+    symbol_clean = symbol.replace("/", "")
+    path = f"/app/data/{symbol_clean}_{timeframe}.parquet"
 
-    if df is None:
-        df = fetch_ohlcv(symbol, timeframe, exchange_name=exchange)
-        append_cache(symbol, timeframe, df)
-        df = load_cache(symbol, timeframe)
+    os.makedirs("/app/data", exist_ok=True)
 
-    if start:
-        df = df[df["timestamp"] >= pd.to_datetime(start)]
+    # download if missing
+    if not os.path.exists(path):
 
-    if end:
-        df = df[df["timestamp"] <= pd.to_datetime(end)]
+        print(f"Downloading {symbol} {timeframe} candles...")
 
-    return df.reset_index(drop=True)
+        df = fetch_ohlcv(symbol, timeframe)
+
+        df.to_parquet(path)
+
+        print(f"Saved to {path}")
+
+    else:
+
+        df = pd.read_parquet(path)
+
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+
+    df = df[(df["timestamp"] >= start) & (df["timestamp"] <= end)]
+
+    return df
