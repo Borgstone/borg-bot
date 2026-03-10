@@ -18,7 +18,9 @@ class BacktestEngine:
         self.trades = []
 
     def run(self, candles: pd.DataFrame):
-
+        if len(candles) == 0:
+        raise ValueError("No candles loaded for the requested time range")
+        
         for i in range(50, len(candles)):
 
             window = candles.iloc[:i]
