@@ -20,13 +20,15 @@ class BacktestEngine:
     def run(self, candles: pd.DataFrame):
         if len(candles) == 0:
         raise ValueError("No candles loaded for the requested time range")
-        
-        for i in range(50, len(candles)):
 
+        for i in range(50, len(candles)):
             window = candles.iloc[:i]
             price = candles.iloc[i]["close"]
 
-            signal = self.strategy.generate_signal(window)
+            context = {
+                "candles": window
+            }
+            signal = self.strategy.generate_signal(context)
 
             # BUY
             if signal > 0 and self.position == 0:
