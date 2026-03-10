@@ -1,12 +1,7 @@
 import argparse
-
 from borgbot.data.loader import load_data
 from borgbot.backtest.engine import BacktestEngine
-from borgbot.core.engine import TradingEngine
-from borgbot.execution.paper import PaperExecutionAdapter
-from borgbot.risk.fixed_fraction import FixedFractionSizing
 from borgbot.strategies.sma import SMAStrategy
-from borgbot.strategies.rsi import RSIStrategy
 
 
 def main():
@@ -20,29 +15,27 @@ def main():
 
     args = parser.parse_args()
 
-    data = load_data(
-        args.symbol,
-        args.tf,
-        args.from_date,
-        args.to_date,
+    # load historical candles
+    candles = load_data(
+        symbol=args.symbol,
+        timeframe=args.tf,
+        start=args.from_date,
+        end=args.to_date
     )
 
-    strategy = SMAStrategy({"fast": 9, "slow": 21})
-
-    risk = FixedFractionSizing({
-    "max_position_frac": 0.1,
-    "min_cash_buffer_frac": 0.1
+    # create strategy
+    strategy = SMAStrategy({
+        "fast": 9,
+        "slow": 21
     })
 
-    execution = PaperExecutionAdapter()
+    # run backtest
+    engine = BacktestEngine(strategy=strategy)
 
-    engine = TradingEngine(strategy, risk, execution)
+    results = engine.run(candles)
 
-    backtest = BacktestEngine(engine, data)
-
-    equity = backtest.run()
-
-    print(equity.tail())
+    print("Backtest finished")
+    print(results)
 
 
 if __name__ == "__main__":
