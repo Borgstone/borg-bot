@@ -61,7 +61,7 @@ class BacktestEngine:
         roi = (equity - 1000) / 1000 * 100
 
         return {
-            "trades": len(self.trades),
-            "roi_pct": round(roi, 2),
-            "final_equity": round(equity, 2)
+            "trades": int(len(self.trades)),
+            "roi_pct": float(round(roi, 2)),
+            "final_equity": float(round(equity, 2))
         }
