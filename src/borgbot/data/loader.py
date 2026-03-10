@@ -10,7 +10,6 @@ def load_data(symbol: str, timeframe: str, start: str, end: str):
 
     os.makedirs("/app/data", exist_ok=True)
 
-    # download if missing
     if not os.path.exists(path):
 
         print(f"Downloading {symbol} {timeframe} candles...")
@@ -27,6 +26,14 @@ def load_data(symbol: str, timeframe: str, start: str, end: str):
 
     df["timestamp"] = pd.to_datetime(df["timestamp"])
 
-    df = df[(df["timestamp"] >= start) & (df["timestamp"] <= end)]
+    start = pd.to_datetime(start)
+    end = pd.to_datetime(end)
 
-    return df
+    filtered = df[(df["timestamp"] >= start) & (df["timestamp"] <= end)]
+
+    # fallback if range empty
+    if filtered.empty:
+        print("WARNING: Requested range has no candles. Using full dataset instead.")
+        filtered = df
+
+    return filtered.reset_index(drop=True)
