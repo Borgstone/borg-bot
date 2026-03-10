@@ -17,9 +17,9 @@ class BacktestEngine:
         self.slippage_pct = slippage_pct
         self.trades = []
 
-    def run(self, candles: pd.DataFrame):
+    def run(self, candles):
         if len(candles) == 0:
-        raise ValueError("No candles loaded for the requested time range")
+            raise ValueError("No candles loaded for the requested time range")
 
         for i in range(50, len(candles)):
             window = candles.iloc[:i]
