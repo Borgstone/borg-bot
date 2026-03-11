@@ -1,4 +1,10 @@
 services:
+  research-optimize:
+    image: borg-bot:local
+    command: python -m borgbot.research.optimizer  
+    volumes:
+      - /opt/borg/data:/app/data
+      - /opt/borg/research:/app/research
   research:
     build: .
     image: borg-bot:local
