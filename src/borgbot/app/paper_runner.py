@@ -48,7 +48,10 @@ def main():
             return 0.0
 
     strategy_stack = StrategyStack([(HoldStrategy(), 1.0)])
-    risk_engine = FixedFractionSizing(fraction=0.1)
+    
+    risk_engine = FixedFractionSizing({
+    "max_position_frac": 0.1
+    })
 
     execution = PaperExecutionAdapter(
     conn,

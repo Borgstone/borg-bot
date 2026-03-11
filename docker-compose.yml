@@ -1,11 +1,13 @@
 services:
   research-optimize:
+    profiles: ["research"]
     image: borg-bot:local
     command: python -m borgbot.research.optimizer  
     volumes:
       - /opt/borg/data:/app/data
       - /opt/borg/research:/app/research
   research:
+    profiles: ["research"]
     build: .
     image: borg-bot:local
     container_name: borg-research
