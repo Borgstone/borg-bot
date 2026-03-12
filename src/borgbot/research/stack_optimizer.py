@@ -95,10 +95,6 @@ def save_results(results):
 
 def main():
     
-    experiment_id = str(uuid.uuid4())[:8]
-    timestamp = datetime.datetime.utcnow().isoformat()
-    dataset = f"{args.from_date}:{args.to_date}"
-
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--symbol", required=True)
@@ -108,6 +104,13 @@ def main():
     parser.add_argument("--resources", default="low")
 
     args = parser.parse_args()
+
+    experiment_id = str(uuid.uuid4())[:8]
+    timestamp = datetime.datetime.utcnow().isoformat()
+    dataset = f"{args.from_date}:{args.to_date}"
+    
+    symbol = args.symbol
+    timeframe = args.tf
 
     candles = load_data(
     args.symbol,
