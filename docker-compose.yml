@@ -1,4 +1,13 @@
 services:
+  research-walkforward:
+    image: borg-bot:local
+    container_name: borg-research-walkforward
+    volumes:
+      - /opt/borg/data:/app/data
+      - /opt/borg/research:/app/research
+    working_dir: /app
+    command: python -m borgbot.research.walkforward
+    profiles: ["research"]
   research-stack:
     image: borg-bot:local
     container_name: borg-research-stack
