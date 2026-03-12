@@ -1,4 +1,14 @@
 services:
+  research-stack:
+    image: borg-bot:local
+    container_name: borg-research-stack
+    volumes:
+      - /opt/borg/data:/app/data
+      - /opt/borg/research:/app/research
+    working_dir: /app
+    command: python -m borgbot.research.stack_optimizer
+    profiles: ["research"]
+  
   research-optimize:
     profiles: ["research"]
     image: borg-bot:local
