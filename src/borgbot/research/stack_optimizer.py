@@ -60,7 +60,7 @@ def resource_workers(level):
     return 1
 
 
-def save_results(results):
+def save_results(results, experiment_id, timestamp, symbol, timeframe, dataset):
 
     Path("/app/research").mkdir(parents=True, exist_ok=True)
 
@@ -86,7 +86,17 @@ def save_results(results):
     for r in results:
         cur.execute(
             "INSERT INTO stack_results VALUES (?,?,?,?,?,?,?,?,?)",
-            (experiment_id,timestamp,symbol,timeframe,dataset,r["strategies"],r["roi"],r["drawdown"],r["score"],),
+            (
+                experiment_id,
+                timestamp,
+                symbol,
+                timeframe,
+                dataset,
+                r["strategies"],
+                r["roi"],
+                r["drawdown"],
+                r["score"],
+            ),
         )
 
     conn.commit()
@@ -142,7 +152,14 @@ def main():
 
     results = sorted(results, key=lambda x: x["score"], reverse=True)
 
-    save_results(results)
+    save_results(
+    results,
+    experiment_id,
+    timestamp,
+    symbol,
+    timeframe,
+    dataset,
+    )
 
     print("Top strategies\n")
 
