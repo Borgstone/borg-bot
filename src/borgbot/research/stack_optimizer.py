@@ -92,11 +92,18 @@ def main():
 
     parser.add_argument("--symbol", required=True)
     parser.add_argument("--tf", required=True)
+    parser.add_argument("--from_date", required=True)
+    parser.add_argument("--to_date", required=True)
     parser.add_argument("--resources", default="low")
 
     args = parser.parse_args()
 
-    candles = load_data(args.symbol, args.tf)
+    candles = load_data(
+    args.symbol,
+    args.tf,
+    args.from_date,
+    args.to_date,
+    )
 
     strategies = [
         SMAStrategy({"fast": 9, "slow": 21}),
