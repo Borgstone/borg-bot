@@ -2,6 +2,8 @@ import argparse
 import itertools
 import multiprocessing
 import sqlite3
+import uuid
+import datetime
 from pathlib import Path
 
 from borgbot.backtest.engine import BacktestEngine
@@ -68,18 +70,23 @@ def save_results(results):
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS stack_results (
+            experiment_id TEXT,
+            timestamp TEXT,
+            symbol TEXT,
+            timeframe TEXT,
+            dataset TEXT,
             strategies TEXT,
             roi REAL,
             drawdown REAL,
             score REAL
         )
-        """
+    """
     )
 
     for r in results:
         cur.execute(
-            "INSERT INTO stack_results VALUES (?,?,?,?)",
-            (r["strategies"], r["roi"], r["drawdown"], r["score"]),
+            "INSERT INTO stack_results VALUES (?,?,?,?,?,?,?,?,?)",
+            (experiment_id,timestamp,symbol,timeframe,dataset,r["strategies"],r["roi"],r["drawdown"],r["score"],),
         )
 
     conn.commit()
@@ -87,6 +94,10 @@ def save_results(results):
 
 
 def main():
+    
+    experiment_id = str(uuid.uuid4())[:8]
+    timestamp = datetime.datetime.utcnow().isoformat()
+    dataset = f"{args.from_date}:{args.to_date}"
 
     parser = argparse.ArgumentParser()
 
