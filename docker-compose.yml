@@ -1,4 +1,11 @@
 services:
+  research-download:
+    image: borg-bot:local
+    volumes:
+      - /opt/borg/data:/app/data
+    working_dir: /app
+    command: python -m borgbot.data.downloader
+    profiles: ["research"]
   research-walkforward:
     image: borg-bot:local
     container_name: borg-research-walkforward
