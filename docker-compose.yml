@@ -1,4 +1,11 @@
 services:
+  data-sync:
+    image: borg-bot:local
+    volumes:
+      - /opt/borg/data:/app/data
+    working_dir: /app
+    command: python -m borgbot.data.sync
+    restart: always
   research-download:
     image: borg-bot:local
     volumes:
