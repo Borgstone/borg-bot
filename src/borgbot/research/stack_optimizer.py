@@ -8,7 +8,7 @@ from pathlib import Path
 
 from borgbot.backtest.engine import BacktestEngine
 from borgbot.data.loader import load_data
-
+from borgbot.data.indicator_cache import build_indicator_cache
 from borgbot.strategies.sma import SMAStrategy
 from borgbot.strategies.rsi import RSIStrategy
 from borgbot.strategies.stack import StrategyStack
@@ -122,12 +122,8 @@ def main():
     symbol = args.symbol
     timeframe = args.tf
 
-    candles = load_data(
-    args.symbol,
-    args.tf,
-    args.from_date,
-    args.to_date,
-    )
+    candles = load_data(...)
+    candles = build_indicator_cache(candles)
 
     strategies = [
         SMAStrategy({"fast": 9, "slow": 21}),

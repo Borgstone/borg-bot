@@ -2,7 +2,7 @@ import argparse
 from borgbot.data.loader import load_data
 from borgbot.backtest.engine import BacktestEngine
 from borgbot.strategies.sma import SMAStrategy
-
+from borgbot.data.indicator_cache import build_indicator_cache
 
 def main():
 

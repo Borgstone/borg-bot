@@ -1,7 +1,7 @@
 import argparse
 import os
 from concurrent.futures import ProcessPoolExecutor
-
+from borgbot.data.indicator_cache import build_indicator_cache
 from borgbot.data.loader import load_data
 from borgbot.backtest.engine import BacktestEngine
 from borgbot.strategies.sma import SMAStrategy
@@ -80,7 +80,8 @@ def main():
 
     init_db()
 
-    candles = load_data(args.symbol, args.tf, "2020-01-01", "2030-01-01")
+    candles = load_data(...)
+    candles = build_indicator_cache(candles)
 
     combos = generate_sma_grid(args.fast, args.slow)
 

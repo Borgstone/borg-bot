@@ -3,7 +3,7 @@ import datetime
 import sqlite3
 import uuid
 from dateutil.relativedelta import relativedelta
-
+from borgbot.data.indicator_cache import build_indicator_cache
 from borgbot.data.loader import load_data
 from borgbot.backtest.engine import BacktestEngine
 from borgbot.strategies.sma import SMAStrategy
@@ -85,6 +85,9 @@ def main():
     parser.add_argument("--test_months", type=int, default=3)
 
     args = parser.parse_args()
+
+    candles = load_data(...)
+    candles = build_indicator_cache(candles)
 
     start = datetime.datetime.fromisoformat(args.start)
     end = datetime.datetime.fromisoformat(args.end)
