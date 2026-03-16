@@ -106,7 +106,7 @@ def main():
         (RSIStrategy({"period": 14, "overbought": 70, "oversold": 30}), 1.0)
     ])
 
-   rows = []
+    rows = []
 
     for train_start in month_range(start, end, args.test_months):
 
