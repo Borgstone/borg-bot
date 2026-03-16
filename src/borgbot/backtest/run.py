@@ -23,6 +23,8 @@ def main():
         end=args.to_date
     )
 
+    candles = build_indicator_cache(candles)
+
     # create strategy
     strategy = SMAStrategy({
         "fast": 9,

@@ -122,6 +122,13 @@ def main():
     symbol = args.symbol
     timeframe = args.tf
 
+    candles = load_data(
+    args.symbol,
+    args.tf,
+    args.from_date,
+    args.to_date,
+    )
+
     candles = load_data(...)
     candles = build_indicator_cache(candles)
 
