@@ -106,7 +106,7 @@ def main():
         (RSIStrategy({"period": 14, "overbought": 70, "oversold": 30}), 1.0)
     ])
 
-    rows = []
+   rows = []
 
     for train_start in month_range(start, end, args.test_months):
 
@@ -116,22 +116,18 @@ def main():
         if test_end > end:
             break
 
-        train_candles = load_data(
-            args.symbol,
-            args.tf,
-            train_start.isoformat(),
-            train_end.isoformat(),
+        candles = load_data(
+            symbol=args.symbol,
+            timeframe=args.tf,
+            start=train_start.isoformat(),
+            end=test_end.isoformat(),
         )
 
-        test_candles = load_data(
-            args.symbol,
-            args.tf,
-            train_end.isoformat(),
-            test_end.isoformat(),
-        )
+        from borgbot.data.indicator_cache import build_indicator_cache
+        candles = build_indicator_cache(candles)
 
-        train_result = run_backtest(strategies, train_candles)
-        test_result = run_backtest(strategies, test_candles)
+        train_candles = candles[candles["timestamp"] < train_end]
+        test_candles = candles[candles["timestamp"] >= train_end]
 
         rows.append(
             {

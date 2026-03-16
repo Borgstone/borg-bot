@@ -17,6 +17,11 @@ def build_indicator_cache(df):
     cache["rsi_14"] = rsi(cache["close"], 14)
 
     # Precompute ATR
-    cache["atr_14"] = atr(cache, 14)
+    cache["atr_14"] = atr(
+    cache["high"],
+    cache["low"],
+    cache["close"],
+    14,
+    )
 
     return cache
