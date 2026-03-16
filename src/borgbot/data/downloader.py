@@ -3,6 +3,7 @@ import ccxt
 import pandas as pd
 import os
 import time
+import datetime
 
 
 DATA_DIR = "/app/data"
@@ -12,8 +13,8 @@ def download(symbol, timeframe, start, end):
 
     exchange = ccxt.kucoin()
 
-    since = exchange.parse8601(start)
-    end_ts = exchange.parse8601(end)
+    since = int(datetime.datetime.fromisoformat(start).timestamp() * 1000)
+    end_ts = int(datetime.datetime.fromisoformat(end).timestamp() * 1000)
 
     all_candles = []
 
@@ -36,6 +37,8 @@ def download(symbol, timeframe, start, end):
         time.sleep(exchange.rateLimit / 1000)
 
         print("Downloaded", len(all_candles), "candles")
+
+        time.sleep(exchange.rateLimit / 1000)
 
     df = pd.DataFrame(
         all_candles,
