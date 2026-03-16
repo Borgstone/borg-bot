@@ -3,7 +3,6 @@ import datetime
 import sqlite3
 import uuid
 from dateutil.relativedelta import relativedelta
-from borgbot.data.indicator_cache import build_indicator_cache
 from borgbot.data.loader import load_data
 from borgbot.backtest.engine import BacktestEngine
 from borgbot.strategies.sma import SMAStrategy
@@ -86,7 +85,14 @@ def main():
 
     args = parser.parse_args()
 
-    candles = load_data(...)
+    candles = load_data(
+    symbol=args.symbol,
+    timeframe=args.tf,
+    start=train_start.isoformat(),
+    end=test_end.isoformat(),
+    )
+    
+    from borgbot.data.indicator_cache import build_indicator_cache
     candles = build_indicator_cache(candles)
 
     start = datetime.datetime.fromisoformat(args.start)

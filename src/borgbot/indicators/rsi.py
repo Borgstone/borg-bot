@@ -1,26 +1,18 @@
 from typing import List
+import pandas as pd
 
-def rsi(values: List[float], period: int = 14) -> float:
+def rsi(series, period=14):
 
-    if len(values) <= period:
-        return 50.0
+    delta = series.diff()
 
-    gains = []
-    losses = []
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
 
-    for i in range(-period, 0):
-        diff = values[i] - values[i-1]
-
-        if diff > 0:
-            gains.append(diff)
-        else:
-            losses.append(abs(diff))
-
-    avg_gain = sum(gains) / period if gains else 0
-    avg_loss = sum(losses) / period if losses else 0
-
-    if avg_loss == 0:
-        return 100.0
+    avg_gain = gain.rolling(period).mean()
+    avg_loss = loss.rolling(period).mean()
 
     rs = avg_gain / avg_loss
-    return 100 - (100 / (1 + rs))
+
+    rsi = 100 - (100 / (1 + rs))
+
+    return rsi
