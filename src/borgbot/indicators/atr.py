@@ -1,18 +1,16 @@
-from typing import List
+import pandas as pd
 
-def atr(highs: List[float], lows: List[float], closes: List[float], period: int = 14):
+def atr(high, low, close, period: int = 14):
+    high = pd.Series(high)
+    low = pd.Series(low)
+    close = pd.Series(close)
 
-    if len(closes) <= period:
-        return 0.0
+    prev_close = close.shift(1)
 
-    trs = []
+    tr1 = high - low
+    tr2 = (high - prev_close).abs()
+    tr3 = (low - prev_close).abs()
 
-    for i in range(1, len(closes)):
-        tr = max(
-            highs[i] - lows[i],
-            abs(highs[i] - closes[i-1]),
-            abs(lows[i] - closes[i-1])
-        )
-        trs.append(tr)
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
 
-    return sum(trs[-period:]) / period
+    return tr.rolling(period).mean()
