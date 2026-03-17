@@ -8,7 +8,7 @@ class SMAStrategy(Strategy):
 
         candles = context["candles"]
 
-        closes = candles["close"].tolist()
+        closes = context["candles"]["close"]
 
         if len(closes) < 30:
             return 0.0
