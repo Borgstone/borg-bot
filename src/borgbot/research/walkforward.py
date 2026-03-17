@@ -4,6 +4,7 @@ import sqlite3
 import uuid
 from dateutil.relativedelta import relativedelta
 from borgbot.data.loader import load_data
+from borgbot.data.indicator_cache import build_indicator_cache
 from borgbot.backtest.engine import BacktestEngine
 from borgbot.strategies.sma import SMAStrategy
 from borgbot.strategies.rsi import RSIStrategy
@@ -85,16 +86,6 @@ def main():
 
     args = parser.parse_args()
 
-    candles = load_data(
-    symbol=args.symbol,
-    timeframe=args.tf,
-    start=train_start.isoformat(),
-    end=test_end.isoformat(),
-    )
-    
-    from borgbot.data.indicator_cache import build_indicator_cache
-    candles = build_indicator_cache(candles)
-
     start = datetime.datetime.fromisoformat(args.start)
     end = datetime.datetime.fromisoformat(args.end)
 
@@ -123,12 +114,12 @@ def main():
             end=test_end.isoformat(),
         )
 
-        from borgbot.data.indicator_cache import build_indicator_cache
         candles = build_indicator_cache(candles)
 
         train_candles = candles[candles["timestamp"] < train_end]
         test_candles = candles[candles["timestamp"] >= train_end]
-
+        test_result = run_backtest(strategies, test_candles)
+        
         rows.append(
             {
                 "experiment_id": experiment_id,
