@@ -1,4 +1,11 @@
 services:
+  research-discovery:
+    build: .
+    container_name: borg-research-discovery
+    command: sleep infinity
+    volumes:
+      - /opt/borg/data:/app/data
+      - /opt/borg/research:/app/research
   data-sync:
     image: borg-bot:local
     volumes:
