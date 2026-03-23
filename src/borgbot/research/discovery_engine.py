@@ -1,5 +1,4 @@
 import argparse
-import itertools
 import sqlite3
 import uuid
 import datetime
@@ -15,6 +14,9 @@ from borgbot.strategies.stack import StrategyStack
 
 
 DB_PATH = "/app/research/research.db"
+
+# Shared across workers
+GLOBAL_CANDLES = None
 
 
 # ---------------------------
@@ -33,6 +35,14 @@ def resolve_workers(mode: str) -> int:
         return max(1, cpu - 1)
     else:
         return 1
+
+
+# ---------------------------
+# INIT WORKER (memory fix)
+# ---------------------------
+def init_worker(candles):
+    global GLOBAL_CANDLES
+    GLOBAL_CANDLES = candles
 
 
 # ---------------------------
@@ -63,17 +73,18 @@ def build_strategy(config):
 
 
 # ---------------------------
-# SCORING FUNCTION (risk-first)
+# SCORING FUNCTION
 # ---------------------------
 def score_result(roi, drawdown):
-    return roi - (drawdown * 100)  # penalize drawdown heavily
+    return roi - (drawdown * 100)
 
 
 # ---------------------------
 # SINGLE RUN
 # ---------------------------
-def run_task(args):
-    config, candles = args
+def run_task(config):
+    global GLOBAL_CANDLES
+    candles = GLOBAL_CANDLES
 
     strategy = build_strategy(config)
 
@@ -149,7 +160,7 @@ def main():
 
     args = parser.parse_args()
 
-    # LOAD DATA
+    # LOAD DATA ONCE
     candles = load_data(
         symbol=args.symbol,
         timeframe=args.tf,
@@ -195,15 +206,17 @@ def main():
 
     print(f"\nRunning {len(configs)} strategies with {workers} workers\n")
 
-    tasks = [(cfg, candles) for cfg in configs]
-
+    # SINGLE THREAD (safe)
     if workers == 1:
-        results = [run_task(t) for t in tasks]
-    else:
-        with Pool(workers) as pool:
-            results = pool.map(run_task, tasks)
+        init_worker(candles)
+        results = [run_task(cfg) for cfg in configs]
 
-    # SORT
+    # MULTIPROCESS (memory-safe)
+    else:
+        with Pool(workers, initializer=init_worker, initargs=(candles,)) as pool:
+            results = pool.map(run_task, configs)
+
+    # SORT RESULTS
     results.sort(key=lambda x: x["score"], reverse=True)
 
     print("\nTop strategies:\n")
