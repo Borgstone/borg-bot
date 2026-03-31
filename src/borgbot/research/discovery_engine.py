@@ -107,8 +107,8 @@ def run_task(config):
     wf = run_walkforward(
         config=config,
         candles=GLOBAL_CANDLES,
-        train_months=12,
-        test_months=3,
+        train_months=1,
+        test_months=1,
     )
 
     if wf is None:
