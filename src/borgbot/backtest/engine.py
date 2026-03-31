@@ -21,6 +21,8 @@ class BacktestEngine:
         if len(candles) == 0:
             raise ValueError("No candles loaded for the requested time range")
 
+        equity_curve = []
+
         for i in range(50, len(candles)):
             window = candles.iloc[:i]
             price = candles.iloc[i]["close"]
@@ -28,33 +30,50 @@ class BacktestEngine:
             context = {
                 "candles": window
             }
+
             signal = self.strategy.generate_signal(context)
 
             # BUY
             if signal > 0 and self.position == 0:
-
                 qty = self.cash / price
                 cost = qty * price
-
                 fee = cost * self.fees_bps / 10000
 
                 self.cash -= cost + fee
                 self.position = qty
-
                 self.trades.append(("buy", price))
 
             # SELL
             elif signal < 0 and self.position > 0:
-
                 value = self.position * price
                 fee = value * self.fees_bps / 10000
 
                 self.cash += value - fee
                 self.position = 0
-
                 self.trades.append(("sell", price))
 
-        # final equity
+            equity = self.cash + self.position * price
+            equity_curve.append(equity)
+
+        if not equity_curve:
+            return {
+                "trades": 0,
+                "roi_pct": 0.0,
+                "final_equity": self.cash,
+                "max_drawdown": 0.0,
+            }
+
+        # Drawdown
+        peak = equity_curve[0]
+        max_dd = 0.0
+
+        for value in equity_curve:
+            if value > peak:
+                peak = value
+            dd = (peak - value) / peak
+            if dd > max_dd:
+                max_dd = dd
+
         final_price = candles.iloc[-1]["close"]
         equity = self.cash + self.position * final_price
 
@@ -63,5 +82,6 @@ class BacktestEngine:
         return {
             "trades": int(len(self.trades)),
             "roi_pct": float(round(roi, 2)),
-            "final_equity": float(round(equity, 2))
+            "final_equity": float(round(equity, 2)),
+            "max_drawdown": float(round(max_dd, 4)),
         }

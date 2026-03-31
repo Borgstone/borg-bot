@@ -11,7 +11,9 @@ from borgbot.backtest.engine import BacktestEngine
 from borgbot.strategies.sma import SMAStrategy
 from borgbot.strategies.rsi import RSIStrategy
 from borgbot.strategies.stack import StrategyStack
+from borgbot.research.walkforward_core import run_walkforward
 
+SCORING_MODE = "balanced"
 
 DB_PATH = "/app/research/research.db"
 
@@ -82,23 +84,46 @@ def score_result(roi, drawdown):
 # ---------------------------
 # SINGLE RUN
 # ---------------------------
+def score_walkforward(metrics, mode="balanced"):
+    roi = metrics["roi_median"]
+    dd = metrics["drawdown_max"]
+    std = metrics["roi_std"]
+
+    if mode == "conservative":
+        return roi - (dd * 200) - (std * 50)
+
+    elif mode == "balanced":
+        return roi - (dd * 100) - (std * 25)
+
+    elif mode == "aggressive":
+        return roi - (dd * 50) - (std * 10)
+
+    return roi - (dd * 100)
+
+
 def run_task(config):
     global GLOBAL_CANDLES
-    candles = GLOBAL_CANDLES
 
-    strategy = build_strategy(config)
+    wf = run_walkforward(
+        config=config,
+        candles=GLOBAL_CANDLES,
+        train_months=12,
+        test_months=3,
+    )
 
-    engine = BacktestEngine(strategy=strategy)
-    result = engine.run(candles)
+    if wf is None:
+        return None
 
-    roi = float(result["roi_pct"])
-    dd = float(result.get("max_drawdown", 0.0))
+    metrics = wf["metrics"]
+
+    score = score_walkforward(metrics, mode=SCORING_MODE)
 
     return {
         "config": config,
-        "roi": roi,
-        "drawdown": dd,
-        "score": score_result(roi, dd),
+        "roi": metrics["roi_median"],
+        "drawdown": metrics["drawdown_max"],
+        "score": score,
+        "roi_std": metrics["roi_std"],
     }
 
 
@@ -120,7 +145,8 @@ def save_results(rows, symbol, timeframe):
             config TEXT,
             roi REAL,
             drawdown REAL,
-            score REAL
+            score REAL,
+            roi_std REAL
         )
     """
     )
@@ -130,7 +156,7 @@ def save_results(rows, symbol, timeframe):
 
     for r in rows:
         cur.execute(
-            "INSERT INTO discovery_results VALUES (?,?,?,?,?,?,?,?)",
+            "INSERT INTO discovery_results VALUES (?,?,?,?,?,?,?,?,?)",
             (
                 experiment_id,
                 timestamp,
@@ -139,6 +165,7 @@ def save_results(rows, symbol, timeframe):
                 str(r["config"]),
                 r["roi"],
                 r["drawdown"],
+                r["roi_std"],
                 r["score"],
             ),
         )
@@ -153,12 +180,15 @@ def save_results(rows, symbol, timeframe):
 def main():
 
     parser = argparse.ArgumentParser()
-
+    parser.add_argument("--scoring", default="balanced")
     parser.add_argument("--symbol", required=True)
     parser.add_argument("--tf", required=True)
     parser.add_argument("--resources", default="low")
 
     args = parser.parse_args()
+
+    global SCORING_MODE
+    SCORING_MODE = args.scoring
 
     # LOAD DATA ONCE
     candles = load_data(
@@ -206,15 +236,17 @@ def main():
 
     print(f"\nRunning {len(configs)} strategies with {workers} workers\n")
 
-    # SINGLE THREAD (safe)
-    if workers == 1:
-        init_worker(candles)
-        results = [run_task(cfg) for cfg in configs]
+    # SINGLE THREAD
+if workers == 1:
+    init_worker(candles)
+    results = [run_task(cfg) for cfg in configs]
 
-    # MULTIPROCESS (memory-safe)
-    else:
-        with Pool(workers, initializer=init_worker, initargs=(candles,)) as pool:
-            results = pool.map(run_task, configs)
+# MULTIPROCESS
+else:
+    with Pool(workers, initializer=init_worker, initargs=(candles,)) as pool:
+        results = pool.map(run_task, configs)
+
+results = [r for r in results if r is not None]
 
     # SORT RESULTS
     results.sort(key=lambda x: x["score"], reverse=True)
