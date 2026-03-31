@@ -18,7 +18,7 @@ def load_data(symbol: str, timeframe: str, start: str, end: str):
 
     else:
         df = pd.read_parquet(path)
-        df["timestamp"] = pd.to_datetime(df["timestamp"])
+    
 
     df["timestamp"] = pd.to_datetime(df["timestamp"])
 
