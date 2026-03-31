@@ -107,8 +107,8 @@ def run_task(config):
     wf = run_walkforward(
         config=config,
         candles=GLOBAL_CANDLES,
-        train_months=1,
-        test_months=1,
+        train_months=12,
+        test_months=3,
     )
 
     if wf is None:
@@ -231,7 +231,10 @@ def main():
                         "slow": slow,
                         "period": period,
                     })
-
+    
+    # LIMIT CONFIGS FOR TESTING
+    configs = configs[:20]
+    
     workers = resolve_workers(args.resources)
 
     print(f"\nRunning {len(configs)} strategies with {workers} workers\n")

@@ -78,6 +78,7 @@ def run_backtest(config, candles):
 
 def optimize_on_train(config, train_data):
     grid = generate_grid(config)
+    grid = grid[:30]  # LIMIT FOR VPS
 
     best = None
     best_score = -1e9
@@ -107,7 +108,13 @@ def run_walkforward(config, candles, train_months, test_months):
 
     folds = []
 
+    fold_count = 0
+
     while True:
+        fold_count += 1
+        if fold_count > 3:
+            break
+
         train_end = current + relativedelta(months=train_months)
         test_end = train_end + relativedelta(months=test_months)
 
