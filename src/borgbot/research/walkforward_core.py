@@ -99,6 +99,10 @@ def run_walkforward(config, candles, train_months, test_months):
     start = candles["timestamp"].min()
     end = candles["timestamp"].max()
 
+    print("DEBUG TIMESTAMP TYPE:", candles["timestamp"].dtype)
+    print("DEBUG TIMESTAMP SAMPLE:")
+    print(candles["timestamp"].head())
+
     current = start
 
     folds = []
@@ -115,6 +119,10 @@ def run_walkforward(config, candles, train_months, test_months):
             (candles["timestamp"] >= train_end) &
             (candles["timestamp"] < test_end)
         ]
+        print(
+            f"DEBUG SPLIT → Train: {len(train)} | Test: {len(test)} | "
+            f"TrainEnd: {train_end} | TestEnd: {test_end}"
+        )
 
         if len(train) < 100 or len(test) < 50:
             current += relativedelta(months=test_months)

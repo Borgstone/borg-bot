@@ -11,18 +11,14 @@ def load_data(symbol: str, timeframe: str, start: str, end: str):
     os.makedirs("/app/data", exist_ok=True)
 
     if not os.path.exists(path):
-
         print(f"Downloading {symbol} {timeframe} candles...")
-
         df = fetch_ohlcv(symbol, timeframe)
-
         df.to_parquet(path)
-
         print(f"Saved to {path}")
 
     else:
-
         df = pd.read_parquet(path)
+        df["timestamp"] = pd.to_datetime(df["timestamp"])
 
     df["timestamp"] = pd.to_datetime(df["timestamp"])
 
