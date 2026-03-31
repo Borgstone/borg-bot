@@ -237,16 +237,16 @@ def main():
     print(f"\nRunning {len(configs)} strategies with {workers} workers\n")
 
     # SINGLE THREAD
-if workers == 1:
-    init_worker(candles)
-    results = [run_task(cfg) for cfg in configs]
+    if workers == 1:
+        init_worker(candles)
+        results = [run_task(cfg) for cfg in configs]
 
-# MULTIPROCESS
-else:
-    with Pool(workers, initializer=init_worker, initargs=(candles,)) as pool:
-        results = pool.map(run_task, configs)
+    # MULTIPROCESS
+    else:
+        with Pool(workers, initializer=init_worker, initargs=(candles,)) as pool:
+            results = pool.map(run_task, configs)
 
-results = [r for r in results if r is not None]
+    results = [r for r in results if r is not None]
 
     # SORT RESULTS
     results.sort(key=lambda x: x["score"], reverse=True)
