@@ -78,7 +78,7 @@ def run_backtest(config, candles):
 
 def optimize_on_train(config, train_data):
     grid = generate_grid(config)
-    grid = grid[:30]  # LIMIT FOR VPS
+    grid = grid[:10]  # LIMIT FOR VPS
 
     best = None
     best_score = -1e9

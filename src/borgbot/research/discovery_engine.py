@@ -102,6 +102,7 @@ def score_walkforward(metrics, mode="balanced"):
 
 
 def run_task(config):
+    print(f"Running config: {config}")
     global GLOBAL_CANDLES
 
     wf = run_walkforward(
@@ -233,7 +234,7 @@ def main():
                     })
     
     # LIMIT CONFIGS FOR TESTING
-    configs = configs[:20]
+    configs = configs[:5]
     
     workers = resolve_workers(args.resources)
 
