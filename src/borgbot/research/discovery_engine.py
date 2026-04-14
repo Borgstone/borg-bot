@@ -122,7 +122,7 @@ def run_task(config):
     metrics = wf["metrics"]
     # 🚨 FILTER BAD STRATEGIES
     if metrics["roi_std"] > 10:
-    return None
+        return None
 
     score = score_walkforward(metrics, mode=SCORING_MODE)
 
@@ -274,7 +274,7 @@ def main():
             f"STD {r['roi_std']:.2f} "
             f"Score {r['score']:.2f}"
         )
-        
+
     print("\nTop strategies:\n")
 
     for r in results[:10]:
