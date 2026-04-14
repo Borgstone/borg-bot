@@ -100,8 +100,6 @@ def run_walkforward(config, candles, train_months, test_months):
     start = candles["timestamp"].min()
     end = candles["timestamp"].max()
 
-    print("DEBUG TIMESTAMP TYPE:", candles["timestamp"].dtype)
-    print("DEBUG TIMESTAMP SAMPLE:")
     print(candles["timestamp"].head())
 
     current = start

@@ -89,8 +89,6 @@ def score_walkforward(metrics, mode="balanced"):
     dd = metrics["drawdown_max"]
     std = metrics["roi_std"]
 
-    print(f"DEBUG SCORE → ROI: {roi} | DD: {dd} | STD: {std}")
-
     # Normalize components
     dd_penalty = dd * 50        # was 100
     std_penalty = std * 2       # was 25 (WAY too aggressive)
@@ -122,6 +120,9 @@ def run_task(config):
         return None
 
     metrics = wf["metrics"]
+    # 🚨 FILTER BAD STRATEGIES
+    if metrics["roi_std"] > 10:
+    return None
 
     score = score_walkforward(metrics, mode=SCORING_MODE)
 
