@@ -262,6 +262,19 @@ def main():
     # SORT RESULTS
     results.sort(key=lambda x: x["score"], reverse=True)
 
+    from borgbot.research.selector import select_strategies
+    selected = select_strategies(results)
+
+    print("\nSelected strategies:\n")
+
+    for r in selected:
+        print(
+            f"{r['config']} ROI {r['roi']:.2f}% "
+            f"DD {r['drawdown']:.2f} "
+            f"STD {r['roi_std']:.2f} "
+            f"Score {r['score']:.2f}"
+        )
+        
     print("\nTop strategies:\n")
 
     for r in results[:10]:
