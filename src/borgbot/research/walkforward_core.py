@@ -81,7 +81,7 @@ def optimize_on_train(config, train_data):
     grid = grid[:10]  # LIMIT FOR VPS
 
     best = None
-    best_score = -1e9
+    best_score = float("-inf")
 
     for cfg in grid:
         result = run_backtest(cfg, train_data)
@@ -91,7 +91,7 @@ def optimize_on_train(config, train_data):
         if score > best_score:
             best_score = score
             best = cfg
-
+    
     return best
 
 
@@ -135,9 +135,7 @@ def run_walkforward(config, candles, train_months, test_months):
             current += relativedelta(months=test_months)
             continue
 
-        best_config = optimize_on_train(config, train)
-
-        result = run_backtest(best_config, test)
+        result = run_backtest(config, test)
 
         folds.append(result)
 

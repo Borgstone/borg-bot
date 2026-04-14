@@ -88,7 +88,8 @@ def score_walkforward(metrics, mode="balanced"):
     roi = metrics["roi_median"]
     dd = metrics["drawdown_max"]
     std = metrics["roi_std"]
-
+    print(f"DEBUG SCORE → ROI: {roi} | DD: {dd} | STD: {std}")
+    
     if mode == "conservative":
         return roi - (dd * 200) - (std * 50)
 
