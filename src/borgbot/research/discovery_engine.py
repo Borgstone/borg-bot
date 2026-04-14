@@ -88,18 +88,23 @@ def score_walkforward(metrics, mode="balanced"):
     roi = metrics["roi_median"]
     dd = metrics["drawdown_max"]
     std = metrics["roi_std"]
+
     print(f"DEBUG SCORE → ROI: {roi} | DD: {dd} | STD: {std}")
-    
+
+    # Normalize components
+    dd_penalty = dd * 50        # was 100
+    std_penalty = std * 2       # was 25 (WAY too aggressive)
+
     if mode == "conservative":
-        return roi - (dd * 200) - (std * 50)
+        return roi - (dd * 100) - (std * 5)
 
     elif mode == "balanced":
-        return roi - (dd * 100) - (std * 25)
+        return roi - dd_penalty - std_penalty
 
     elif mode == "aggressive":
-        return roi - (dd * 50) - (std * 10)
+        return roi - (dd * 25) - (std * 1)
 
-    return roi - (dd * 100)
+    return roi - dd_penalty - std_penalty
 
 
 def run_task(config):
