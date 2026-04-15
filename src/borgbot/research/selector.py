@@ -1,4 +1,4 @@
-def select_strategies(results, top_n=3, min_roi=0, max_std=10, max_dd=0.3):
+def select_strategies(results, top_n=3, min_roi=0, max_std=25, max_dd=0.3):
     """
     Select only robust strategies
     """
