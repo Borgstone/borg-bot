@@ -15,7 +15,7 @@ class RSIStrategy(Strategy):
 
         rsi_series = rsi(closes, period)
         trend_period = self.config.get("trend_period", 50)
-        sma_series = sma(closes, trend_period)
+        sma_series = candles[f"sma_{trend_period}"]
 
         if len(sma_series) < trend_period:
             return 0.0
