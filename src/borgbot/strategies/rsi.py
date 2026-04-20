@@ -15,11 +15,9 @@ class RSIStrategy(Strategy):
 
         rsi_series = rsi(closes, period)
         trend_period = self.config.get("trend_period", 50)
-        col = f"sma_{trend_period}"
-        if col not in candles:
+        sma_series = candles[f"sma_{trend_period}"]
+        if f"sma_{trend_period}" not in candles:
             return 0.0
-
-        sma_series = candles[col]
 
         if len(sma_series) < trend_period:
             return 0.0
@@ -27,7 +25,12 @@ class RSIStrategy(Strategy):
         trend_value = sma_series.iloc[-1]
         price = closes.iloc[-1]
 
-        if trend_value != trend_value:  # NaN
+        if len(rsi_series) < period:
+            return 0.0
+
+        value = rsi_series.iloc[-1]
+
+        if value != value:  # NaN protection
             return 0.0
 
         # BUY only in uptrend
