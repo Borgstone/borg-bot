@@ -23,7 +23,7 @@ def select_strategies(results, top_n=3, min_roi=0, max_std=25, max_dd=0.3):
     deployable = []
 
     for r in filtered:
-        if r["roi"] > 0.5 and r["roi_std"] < 2:
+        if r["roi"] > 1.0 and r["roi_std"] < 10:
             deployable.append(r)
 
     return deployable[:top_n]

@@ -291,6 +291,7 @@ def main():
         print(
             f"{r['config']} ROI {r['roi']:.2f}% "
             f"DD {r['drawdown']:.2f} "
+            f"STD {r['roi_std']:.2f} "
             f"Score {r['score']:.2f}"
         )
 
