@@ -16,7 +16,11 @@ def build_strategy(config):
 
     elif config["type"] == "rsi":
         strategies.append(
-            (RSIStrategy({"period": config["period"]}), 1.0)
+            (RSIStrategy({
+                "period": config["period"],
+                "overbought": config.get("overbought", 70),
+                "oversold": config.get("oversold", 30),
+            }), 1.0)
         )
 
     elif config["type"] == "sma_rsi":

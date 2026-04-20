@@ -14,10 +14,13 @@ class RSIStrategy(Strategy):
 
         rsi_series = rsi(closes, period)
 
-        if len(rsi_series) == 0:
+        if len(rsi_series) < period:
             return 0.0
 
         value = rsi_series.iloc[-1]
+
+        if value != value:  # NaN protection
+            return 0.0
 
         if value < oversold:
             return 1.0

@@ -223,10 +223,15 @@ def main():
 
     # RSI
     for period in range(10, 21):
-        configs.append({
-            "type": "rsi",
-            "period": period,
-        })
+        for ob in [65, 70, 75]:
+            for os in [25, 30, 35]:
+                if os < ob:
+                    configs.append({
+                        "type": "rsi",
+                        "period": period,
+                        "overbought": ob,
+                        "oversold": os,
+                    })
 
     # SMA + RSI
     for fast in range(5, 16):
@@ -265,7 +270,7 @@ def main():
     from borgbot.research.selector import select_strategies
     selected = select_strategies(results)
 
-    print("\nSelected strategies:\n")
+    print("\nDeployable strategies:\n")
 
     for r in selected:
         print(
@@ -274,6 +279,11 @@ def main():
             f"STD {r['roi_std']:.2f} "
             f"Score {r['score']:.2f}"
         )
+
+    import json
+
+    with open("/app/research/deployable.json", "w") as f:
+        json.dump(selected, f, indent=2)
 
     print("\nTop strategies:\n")
 

@@ -20,4 +20,10 @@ def select_strategies(results, top_n=3, min_roi=0, max_std=25, max_dd=0.3):
     # sort by score
     filtered.sort(key=lambda x: x["score"], reverse=True)
 
-    return filtered[:top_n]
+    deployable = []
+
+    for r in filtered:
+        if r["roi"] > 0.5 and r["roi_std"] < 2:
+            deployable.append(r)
+
+    return deployable[:top_n]
