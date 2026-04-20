@@ -225,13 +225,15 @@ def main():
     for period in range(10, 21):
         for ob in [65, 70, 75]:
             for os in [25, 30, 35]:
-                if os < ob:
-                    configs.append({
-                        "type": "rsi",
-                        "period": period,
-                        "overbought": ob,
-                        "oversold": os,
-                    })
+                for trend in [50, 100]:
+                    if os < ob:
+                        configs.append({
+                            "type": "rsi",
+                            "period": period,
+                            "overbought": ob,
+                            "oversold": os,
+                            "trend_period": trend,
+                        })
 
     # SMA + RSI
     for fast in range(5, 16):

@@ -20,6 +20,7 @@ def build_strategy(config):
                 "period": config["period"],
                 "overbought": config.get("overbought", 70),
                 "oversold": config.get("oversold", 30),
+                "trend_period": config.get("trend_period", 50),
             }), 1.0)
         )
 

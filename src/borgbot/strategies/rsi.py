@@ -1,5 +1,6 @@
 from borgbot.indicators.rsi import rsi
 from .base import Strategy
+from borgbot.indicators.sma import sma
 
 class RSIStrategy(Strategy):
 
@@ -13,6 +14,14 @@ class RSIStrategy(Strategy):
         oversold = self.config.get("oversold", 30)
 
         rsi_series = rsi(closes, period)
+        trend_period = self.config.get("trend_period", 50)
+        sma_series = sma(closes, trend_period)
+
+        if len(sma_series) < trend_period:
+            return 0.0
+
+        trend_value = sma_series.iloc[-1]
+        price = closes.iloc[-1]
 
         if len(rsi_series) < period:
             return 0.0
@@ -22,9 +31,10 @@ class RSIStrategy(Strategy):
         if value != value:  # NaN protection
             return 0.0
 
-        if value < oversold:
+        # BUY only in uptrend
+        if value < oversold and price > trend_value:
             return 1.0
-        elif value > overbought:
+
+        # SELL only in downtrend
+        elif value > overbought and price < trend_value:
             return -1.0
-        else:
-            return 0.0
