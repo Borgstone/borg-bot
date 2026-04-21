@@ -43,12 +43,16 @@ class RSIStrategy(Strategy):
 
         # --- SIGNAL LOGIC ---
 
-        # BUY only in uptrend
-        if value < oversold and price > trend_value:
+        # BUY
+        if value < oversold:
+            if price > trend_value:
+                return 1.0
             return 1.0
 
-        # SELL only in downtrend
-        elif value > overbought and price < trend_value:
+        # SELL
+        elif value > overbought:
+            if price < trend_value:
+                return -1.0
             return -1.0
 
         return 0.0
