@@ -5,6 +5,7 @@ import datetime
 import os
 from multiprocessing import Pool
 
+from borgbot.strategies.rsi_trend import RSITrendStrategy
 from borgbot.data.loader import load_data
 from borgbot.data.indicator_cache import build_indicator_cache
 from borgbot.backtest.engine import BacktestEngine
@@ -69,6 +70,16 @@ def build_strategy(config):
         )
         strategies.append(
             (RSIStrategy({"period": config["period"]}), 0.5)
+        )
+
+    elif config["type"] == "rsi_trend":
+        strategies.append(
+            (RSITrendStrategy({
+                "period": config["period"],
+                "overbought": config["overbought"],
+                "oversold": config["oversold"],
+                "trend_period": config["trend_period"],
+            }), 1.0)
         )
 
     return StrategyStack(strategies)
@@ -235,6 +246,19 @@ def main():
                             "trend_period": trend,
                         })
 
+    # RSI TREND STRATEGY
+    for period in range(10, 21):
+        for ob in [65, 70, 75]:
+            for os in [25, 30, 35]:
+                for trend in [50, 100]:
+                    configs.append({
+                        "type": "rsi_trend",
+                        "period": period,
+                        "overbought": ob,
+                        "oversold": os,
+                        "trend_period": trend,
+                    })
+
     # SMA + RSI
     for fast in range(5, 16):
         for slow in range(20, 51):
@@ -248,7 +272,7 @@ def main():
                     })
     
     # LIMIT CONFIGS FOR TESTING
-    configs = [c for c in configs if c["type"] != "sma"][:10]
+    configs = [c for c in configs if c["type"] != "sma"][:20]
     
     workers = resolve_workers(args.resources)
 
