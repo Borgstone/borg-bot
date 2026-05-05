@@ -10,42 +10,62 @@ class RSITrendStrategy(Strategy):
         candles = context["candles"]
         closes = candles["close"]
 
-        if len(closes) < 100:
-            return 0.0
-
+        # -------------------------
         # CONFIG
+        # -------------------------
         period = self.config.get("period", 14)
-        overbought = self.config.get("overbought", 70)
-        oversold = self.config.get("oversold", 30)
+
+        # Pullback levels (NOT extreme RSI)
+        pullback_low = self.config.get("pullback_low", 40)
+        pullback_high = self.config.get("pullback_high", 60)
+
         trend_period = self.config.get("trend_period", 50)
 
+        # -------------------------
         # INDICATORS
+        # -------------------------
         rsi_series = rsi(closes, period)
-        sma_series = sma(closes, trend_period)
 
-        if len(rsi_series) == 0 or len(sma_series) == 0:
+        if len(rsi_series) < period + 2:
             return 0.0
 
-        value = rsi_series.iloc[-1]
+        # RSI values
+        rsi_now = rsi_series.iloc[-1]
+        rsi_prev = rsi_series.iloc[-2]
+
+        # SMA trend
+        sma_series = sma(closes, trend_period)
+
+        if len(sma_series) < trend_period:
+            return 0.0
+
         trend_value = sma_series.iloc[-1]
         price = closes.iloc[-1]
 
-        # NaN safety
-        if value != value or trend_value != trend_value:
+        # Safety (NaN protection)
+        if trend_value != trend_value:
             return 0.0
 
-        # -------------------
-        # CONTEXT + TRIGGER
-        # -------------------
+        # -------------------------
+        # LOGIC
+        # -------------------------
 
-        # UPTREND → BUY THE DIP
-        if price > trend_value:
-            if value < oversold:
-                return 1.0
+        # === LONG (trend + pullback + momentum up)
+        if (
+            price > trend_value and                # Uptrend
+            rsi_now > pullback_low and             # RSI recovering
+            rsi_prev <= pullback_low and           # Was below → now rising
+            rsi_now > rsi_prev                     # Momentum up
+        ):
+            return 1.0
 
-        # DOWNTREND → SELL THE RALLY
-        elif price < trend_value:
-            if value > overbought:
-                return -1.0
+        # === SHORT (trend + pullback + momentum down)
+        if (
+            price < trend_value and                # Downtrend
+            rsi_now < pullback_high and            # RSI dropping
+            rsi_prev >= pullback_high and          # Was above → now falling
+            rsi_now < rsi_prev                     # Momentum down
+        ):
+            return -1.0
 
         return 0.0

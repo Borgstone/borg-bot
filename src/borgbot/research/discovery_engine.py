@@ -256,14 +256,14 @@ def main():
 
     # RSI TREND STRATEGY
     for period in range(10, 21):
-        for ob in [65, 70, 75]:
-            for os in [25, 30, 35]:
-                for trend in [50, 100]:
+        for trend in [50, 100]:
+            for pull_low in [35, 40, 45]:
+                for pull_high in [55, 60, 65]:
                     configs.append({
                         "type": "rsi_trend",
                         "period": period,
-                        "overbought": ob,
-                        "oversold": os,
+                        "pullback_low": pull_low,
+                        "pullback_high": pull_high,
                         "trend_period": trend,
                     })
 
