@@ -272,7 +272,7 @@ def main():
                     })
     
     # LIMIT CONFIGS FOR TESTING
-    configs = [c for c in configs if c["type"] != "sma"][:20]
+    configs = [c for c in configs if c["type"] != "sma"][:50]
     
     workers = resolve_workers(args.resources)
 
