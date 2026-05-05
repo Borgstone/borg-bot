@@ -9,8 +9,8 @@ from borgbot.strategies.rsi_trend import RSITrendStrategy
 from borgbot.data.loader import load_data
 from borgbot.data.indicator_cache import build_indicator_cache
 from borgbot.backtest.engine import BacktestEngine
-from borgbot.strategies.sma import SMAStrategy
-from borgbot.strategies.rsi import RSIStrategy
+#from borgbot.strategies.sma import SMAStrategy
+#from borgbot.strategies.rsi import RSIStrategy
 from borgbot.strategies.stack import StrategyStack
 from borgbot.research.walkforward_core import run_walkforward
 
@@ -135,6 +135,14 @@ def run_task(config):
     if metrics["roi_std"] > 10:
         return None
 
+    # 🚨 FILTER NO-TRADE STRATEGIES
+    if metrics.get("trades", 0) == 0:
+        return None
+
+    # 🚨 FILTER TOO FEW TRADES
+    if metrics.get("trades", 0) < 5:
+        return None
+
     score = score_walkforward(metrics, mode=SCORING_MODE)
 
     return {
@@ -223,28 +231,28 @@ def main():
     configs = []
 
     # SMA
-    for fast in range(5, 16):
-        for slow in range(20, 51):
-            if fast < slow:
-                configs.append({
-                    "type": "sma",
-                    "fast": fast,
-                    "slow": slow,
-                })
+    #for fast in range(5, 16):
+    #    for slow in range(20, 51):
+    #        if fast < slow:
+    #            configs.append({
+    #                "type": "sma",
+    #                "fast": fast,
+    #                "slow": slow,
+    #            })
 
     # RSI
-    for period in range(10, 21):
-        for ob in [65, 70, 75]:
-            for os in [25, 30, 35]:
-                for trend in [50, 100]:
-                    if os < ob:
-                        configs.append({
-                            "type": "rsi",
-                            "period": period,
-                            "overbought": ob,
-                            "oversold": os,
-                            "trend_period": trend,
-                        })
+    #for period in range(10, 21):
+    #    for ob in [65, 70, 75]:
+    #        for os in [25, 30, 35]:
+    #            for trend in [50, 100]:
+    #                if os < ob:
+    #                    configs.append({
+    #                        "type": "rsi",
+    #                        "period": period,
+    #                        "overbought": ob,
+    #                        "oversold": os,
+    #                        "trend_period": trend,
+    #                    })
 
     # RSI TREND STRATEGY
     for period in range(10, 21):
@@ -260,19 +268,19 @@ def main():
                     })
 
     # SMA + RSI
-    for fast in range(5, 16):
-        for slow in range(20, 51):
-            for period in range(10, 21):
-                if fast < slow:
-                    configs.append({
-                        "type": "sma_rsi",
-                        "fast": fast,
-                        "slow": slow,
-                        "period": period,
-                    })
+    #for fast in range(5, 16):
+    #    for slow in range(20, 51):
+    #        for period in range(10, 21):
+    #            if fast < slow:
+    ##               configs.append({
+    #                    "type": "sma_rsi",
+    #                    "fast": fast,
+    #                    "slow": slow,
+    #                    "period": period,
+    #                })
     
     # LIMIT CONFIGS FOR TESTING
-    configs = [c for c in configs if c["type"] != "sma"][:50]
+    configs = configs[:50]
     
     workers = resolve_workers(args.resources)
 
