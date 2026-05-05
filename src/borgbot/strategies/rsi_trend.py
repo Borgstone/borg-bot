@@ -50,21 +50,19 @@ class RSITrendStrategy(Strategy):
         # LOGIC
         # -------------------------
 
-        # === LONG (trend + pullback + momentum up)
+        # === LONG (trend + pullback zone)
         if (
-            price > trend_value and                # Uptrend
-            rsi_now > pullback_low and             # RSI recovering
-            rsi_prev <= pullback_low and           # Was below → now rising
-            rsi_now > rsi_prev                     # Momentum up
+            price > trend_value and
+            rsi_now > pullback_low and
+            rsi_now < pullback_high
         ):
             return 1.0
 
-        # === SHORT (trend + pullback + momentum down)
+        # === SHORT (trend + pullback zone)
         if (
-            price < trend_value and                # Downtrend
-            rsi_now < pullback_high and            # RSI dropping
-            rsi_prev >= pullback_high and          # Was above → now falling
-            rsi_now < rsi_prev                     # Momentum down
+            price < trend_value and
+            rsi_now < pullback_high and
+            rsi_now > pullback_low
         ):
             return -1.0
 
