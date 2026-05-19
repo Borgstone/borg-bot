@@ -52,6 +52,7 @@ def init_worker(candles):
 # STRATEGY FACTORY
 # ---------------------------
 def build_strategy(config):
+from borgbot.strategies.rsi_trend_v2 import RSITrendV2Strategy
     strategies = []
 
     if config["type"] == "sma":
@@ -78,6 +79,16 @@ def build_strategy(config):
                 "period": config["period"],
                 "overbought": config["overbought"],
                 "oversold": config["oversold"],
+                "trend_period": config["trend_period"],
+            }), 1.0)
+        )
+    
+    elif config["type"] == "rsi_trend_v2":
+        strategies.append(
+            (RSITrendV2Strategy({
+                "period": config["period"],
+                "pullback_low": config["pullback_low"],
+                "pullback_high": config["pullback_high"],
                 "trend_period": config["trend_period"],
             }), 1.0)
         )
@@ -230,6 +241,19 @@ def main():
     # PARAMETER SPACE
     configs = []
 
+    for period in range(10, 21):
+        for low in [30, 35, 40]:
+            for high in [60, 65, 70]:
+                for trend in [50, 100]:
+                    if low < high:
+                        configs.append({
+                            "type": "rsi_trend_v2",
+                            "period": period,
+                            "pullback_low": low,
+                            "pullback_high": high,
+                            "trend_period": trend,
+                        })
+
     # SMA
     #for fast in range(5, 16):
     #    for slow in range(20, 51):
@@ -255,17 +279,17 @@ def main():
     #                    })
 
     # RSI TREND STRATEGY
-    for period in range(10, 21):
-        for trend in [50, 100]:
-            for pull_low in [35, 40, 45]:
-                for pull_high in [55, 60, 65]:
-                    configs.append({
-                        "type": "rsi_trend",
-                        "period": period,
-                        "pullback_low": pull_low,
-                        "pullback_high": pull_high,
-                        "trend_period": trend,
-                    })
+    #for period in range(10, 21):
+    #    for trend in [50, 100]:
+    #        for pull_low in [35, 40, 45]:
+    #            for pull_high in [55, 60, 65]:
+    #                configs.append({
+    #                    "type": "rsi_trend",
+    #                    "period": period,
+    #                    "pullback_low": pull_low,
+    #                    "pullback_high": pull_high,
+    #                    "trend_period": trend,
+    #                })
 
     # SMA + RSI
     #for fast in range(5, 16):
