@@ -1,114 +1,137 @@
-import pandas as pd
+import numpy as np
 
 
 class BacktestEngine:
-
-    def __init__(
-        self,
-        strategy,
-        starting_cash: float = 1000.0,
-        fees_bps: float = 10.0,
-        slippage_pct: float = 0.0005,
-        trailing_pct: float = 0.05,  # 5% trailing stop
-    ):
+    def __init__(self, strategy, config=None):
         self.strategy = strategy
-        self.cash = starting_cash
-        self.position = 0.0
-        self.fees_bps = fees_bps
-        self.slippage_pct = slippage_pct
-        self.trailing_pct = trailing_pct
+        self.config = config or {}
 
-        self.trades = []
+        # Risk config
+        self.atr_period = self.config.get("atr_period", 14)
+        self.atr_stop_mult = self.config.get("atr_stop_mult", 1.5)
+        self.atr_trail_mult = self.config.get("atr_trail_mult", 2.0)
+        self.max_holding = self.config.get("max_holding", 48)
 
-        # Position state
-        self.entry_price = None
-        self.peak_price = None
+    def compute_atr(self, df):
+        high = df["high"]
+        low = df["low"]
+        close = df["close"]
 
-    def run(self, candles):
-        if len(candles) == 0:
-            raise ValueError("No candles loaded for the requested time range")
+        tr1 = high - low
+        tr2 = (high - close.shift()).abs()
+        tr3 = (low - close.shift()).abs()
 
-        for i in range(50, len(candles)):
-            window = candles.iloc[:i]
-            price = candles.iloc[i]["close"]
+        tr = np.maximum(tr1, np.maximum(tr2, tr3))
+        atr = tr.rolling(self.atr_period).mean()
 
-            context = {
-                "candles": window
-            }
+        return atr
 
-            signal = self.strategy.generate_signal(context)
+    def run(self, df):
+        df = df.copy()
 
-            # -------------------
-            # BUY
-            # -------------------
-            if signal > 0 and self.position == 0:
+        df["atr"] = self.compute_atr(df)
 
-                qty = self.cash / price
-                cost = qty * price
+        position = 0  # 1 = long, -1 = short
+        entry_price = 0
+        stop_loss = 0
+        trail_stop = 0
+        holding = 0
 
-                fee = cost * self.fees_bps / 10000
+        equity = 1.0
+        equity_curve = []
 
-                self.cash -= cost + fee
-                self.position = qty
+        for i in range(len(df)):
+            row = df.iloc[i]
 
-                self.trades.append(("buy", price))
+            signal = self.strategy.generate_signal(df, i)
 
-                # initialize trailing state
-                self.entry_price = price
-                self.peak_price = price
+            price = row["close"]
+            atr = row["atr"]
 
-            # -------------------
-            # SELL (signal-based)
-            # -------------------
-            elif signal < 0 and self.position > 0:
+            if np.isnan(atr):
+                equity_curve.append(equity)
+                continue
 
-                value = self.position * price
-                fee = value * self.fees_bps / 10000
+            # ---------------------------
+            # ENTRY
+            # ---------------------------
+            if position == 0:
 
-                self.cash += value - fee
-                self.position = 0
+                if signal == 1:
+                    position = 1
+                    entry_price = price
+                    holding = 0
 
-                self.trades.append(("sell", price))
+                    stop_loss = entry_price - atr * self.atr_stop_mult
+                    trail_stop = entry_price - atr * self.atr_trail_mult
 
-                # reset state
-                self.entry_price = None
-                self.peak_price = None
+                elif signal == -1:
+                    position = -1
+                    entry_price = price
+                    holding = 0
 
-            # -------------------
-            # TRAILING STOP
-            # -------------------
-            if self.position > 0:
+                    stop_loss = entry_price + atr * self.atr_stop_mult
+                    trail_stop = entry_price + atr * self.atr_trail_mult
 
-                # update peak price
-                if self.peak_price is None or price > self.peak_price:
-                    self.peak_price = price
+            # ---------------------------
+            # POSITION MANAGEMENT
+            # ---------------------------
+            else:
+                holding += 1
 
-                stop_price = self.peak_price * (1 - self.trailing_pct)
+                # LONG
+                if position == 1:
 
-                if price < stop_price:
+                    # update trailing
+                    new_trail = price - atr * self.atr_trail_mult
+                    trail_stop = max(trail_stop, new_trail)
 
-                    value = self.position * price
-                    fee = value * self.fees_bps / 10000
+                    exit_reason = False
 
-                    self.cash += value - fee
-                    self.position = 0
+                    # stop loss
+                    if price <= stop_loss:
+                        exit_reason = True
 
-                    self.trades.append(("trailing_stop", price))
+                    # trailing stop
+                    elif price <= trail_stop:
+                        exit_reason = True
 
-                    # reset state
-                    self.entry_price = None
-                    self.peak_price = None
+                    # time exit
+                    elif holding >= self.max_holding:
+                        exit_reason = True
 
-        # -------------------
-        # FINAL EQUITY
-        # -------------------
-        final_price = candles.iloc[-1]["close"]
-        equity = self.cash + self.position * final_price
+                    if exit_reason:
+                        pnl = (price / entry_price) - 1
+                        equity *= (1 + pnl)
 
-        roi = (equity - 1000) / 1000 * 100
+                        position = 0
+
+                # SHORT
+                elif position == -1:
+
+                    new_trail = price + atr * self.atr_trail_mult
+                    trail_stop = min(trail_stop, new_trail)
+
+                    exit_reason = False
+
+                    if price >= stop_loss:
+                        exit_reason = True
+
+                    elif price >= trail_stop:
+                        exit_reason = True
+
+                    elif holding >= self.max_holding:
+                        exit_reason = True
+
+                    if exit_reason:
+                        pnl = (entry_price / price) - 1
+                        equity *= (1 + pnl)
+
+                        position = 0
+
+            equity_curve.append(equity)
 
         return {
-            "trades": int(len(self.trades)),
-            "roi_pct": float(round(roi, 2)),
-            "final_equity": float(round(equity, 2))
+            "equity_curve": equity_curve,
+            "final_equity": equity
         }
