@@ -52,7 +52,7 @@ def init_worker(candles):
 # STRATEGY FACTORY
 # ---------------------------
 def build_strategy(config):
-from borgbot.strategies.rsi_trend_v2 import RSITrendV2Strategy
+    from borgbot.strategies.rsi_trend_v2 import RSITrendV2Strategy
     strategies = []
 
     if config["type"] == "sma":
