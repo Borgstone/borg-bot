@@ -21,5 +21,3 @@ class StrategyStack:
             elif score < 0:
                 return -1
             return 0
-
-        return weighted_sum / total_weight
