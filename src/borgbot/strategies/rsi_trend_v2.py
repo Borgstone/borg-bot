@@ -5,7 +5,7 @@ from .base import Strategy
 
 class RSITrendV2Strategy(Strategy):
 
-    def generate_signal(self, context) -> float:
+    def generate_signal(self, df, i) -> float:
 
         candles = context["candles"]
         closes = candles["close"]

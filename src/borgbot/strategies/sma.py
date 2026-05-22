@@ -4,7 +4,7 @@ from borgbot.indicators.sma import sma
 
 class SMAStrategy(Strategy):
 
-    def generate_signal(self, context):
+    def generate_signal(self, df, i):
 
         candles = context["candles"]
 

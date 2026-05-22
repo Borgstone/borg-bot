@@ -5,16 +5,21 @@ class StrategyStack:
     def __init__(self, strategies: List[Tuple[Strategy, float]]):
         self.strategies = strategies  # (strategy, weight)
 
-    def generate_signal(self, context) -> float:
-        total_weight = 0.0
-        weighted_sum = 0.0
+    class StrategyStack:
+        def __init__(self, strategies):
+            self.strategies = strategies
 
-        for strategy, weight in self.strategies:
-            signal = strategy.generate_signal(context)
-            weighted_sum += signal * weight
-            total_weight += weight
+        def generate_signal(self, df, i):
+            score = 0
 
-        if total_weight == 0:
-            return 0.0
+            for strat, weight in self.strategies:
+                s = strat.generate_signal(df, i)
+                score += s * weight
+
+            if score > 0:
+                return 1
+            elif score < 0:
+                return -1
+            return 0
 
         return weighted_sum / total_weight
