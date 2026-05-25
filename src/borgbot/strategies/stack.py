@@ -1,23 +1,26 @@
-from typing import List, Tuple
-from .base import Strategy
-
 class StrategyStack:
-    def __init__(self, strategies: List[Tuple[Strategy, float]]):
-        self.strategies = strategies  # (strategy, weight)
+    def __init__(self, strategies):
+        """
+        strategies: list of (strategy_instance, weight)
+        """
+        self.strategies = strategies
 
-    class StrategyStack:
-        def __init__(self, strategies):
-            self.strategies = strategies
+    def generate_signal(self, df, i):
+        total_score = 0.0
+        total_weight = 0.0
 
-        def generate_signal(self, df, i):
-            score = 0
+        for strat, weight in self.strategies:
+            signal = strat.generate_signal(df, i)
+            total_score += signal * weight
+            total_weight += weight
 
-            for strat, weight in self.strategies:
-                s = strat.generate_signal(df, i)
-                score += s * weight
-
-            if score > 0:
-                return 1
-            elif score < 0:
-                return -1
+        if total_weight == 0:
             return 0
+
+        score = total_score / total_weight
+
+        if score > 0:
+            return 1
+        elif score < 0:
+            return -1
+        return 0
