@@ -76,7 +76,7 @@ def run_backtest(config, candles):
     result = engine.run(candles)
 
     return {
-        "roi": float(result["roi_pct"]),
+        "roi": float(result.get("roi_pct", result.get("roi", 0))),
         "drawdown": float(result.get("max_drawdown", 0.0)),
     }
 
