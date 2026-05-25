@@ -39,11 +39,14 @@ class BacktestEngine:
 
         equity = 1.0
         equity_curve = []
+        signal_count = 0
 
         for i in range(len(df)):
             row = df.iloc[i]
 
             signal = self.strategy.generate_signal(df, i)
+            if signal != 0:
+                signal_count += 1
 
             price = row["close"]
             atr = row["atr"]
@@ -130,7 +133,7 @@ class BacktestEngine:
                         position = 0
 
             equity_curve.append(equity)
-
+        print(f"DEBUG: Total signals = {signal_count}")
         return {
             "equity_curve": equity_curve,
             "final_equity": equity
