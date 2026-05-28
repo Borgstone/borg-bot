@@ -12,6 +12,16 @@ class RSITrendV2Strategy(Strategy):
 
         price = df["close"].iloc[i]
 
+        if i == 200:
+            print("DEBUG STRATEGY")
+            print("PRICE:", price)
+
+            print("SMA:", df[f"sma_{self.trend_period}"].iloc[i])
+
+            print("RSI:", df[f"rsi_{self.period}"].iloc[i])
+
+            print(df.columns.tolist())
+
         sma = df[f"sma_{self.trend_period}"].iloc[i]
 
         rsi = df[f"rsi_{self.period}"].iloc[i]
