@@ -134,7 +134,12 @@ class BacktestEngine:
 
             equity_curve.append(equity)
         print(f"DEBUG: Total signals = {signal_count}")
+        roi_pct = (equity - 1.0) * 100
+
         return {
             "equity_curve": equity_curve,
-            "final_equity": equity
+            "final_equity": equity,
+            "roi_pct": roi_pct,
+            "trades": signal_count,
+            "max_drawdown": 0.0,
         }

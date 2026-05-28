@@ -9,6 +9,22 @@ class RSITrendV2Strategy:
 
         self.trend_period = config["trend_period"]
 
+        # -------------------------
+        # DEBUG COUNTERS
+        # -------------------------
+
+        self.debug_trend_up = 0
+        self.debug_trend_down = 0
+
+        self.debug_pullback_long = 0
+        self.debug_pullback_short = 0
+
+        self.debug_trigger_long = 0
+        self.debug_trigger_short = 0
+
+        self.debug_final_long = 0
+        self.debug_final_short = 0
+
     def generate_signal(self, df, i):
 
         # Need enough candles
@@ -26,46 +42,91 @@ class RSITrendV2Strategy:
         rsi = df[f"rsi_{self.period}"].iloc[i]
         prev_rsi = df[f"rsi_{self.period}"].iloc[i - 1]
 
-        # DEBUG
-        if i == 200:
-            print("DEBUG STRATEGY")
-            print("PRICE:", price)
-            print("SMA:", sma)
-            print("RSI:", rsi)
-
         # -------------------------
-        # TREND
+        # TREND LAYER
         # -------------------------
 
         trend_up = price > sma
         trend_down = price < sma
 
+        if trend_up:
+            self.debug_trend_up += 1
+
+        if trend_down:
+            self.debug_trend_down += 1
+
         # -------------------------
-        # PULLBACK
+        # PULLBACK LAYER
         # -------------------------
 
-        bullish_pullback = rsi < 50
-        bearish_pullback = rsi > 50
+        bullish_pullback = (
+            rsi >= self.pullback_low
+            and rsi <= self.pullback_high
+        )
+
+        bearish_pullback = (
+            rsi >= (100 - self.pullback_high)
+            and rsi <= (100 - self.pullback_low)
+        )
+
+        if bullish_pullback:
+            self.debug_pullback_long += 1
+
+        if bearish_pullback:
+            self.debug_pullback_short += 1
 
         # -------------------------
-        # TRIGGER
+        # TRIGGER LAYER
         # -------------------------
 
         rsi_turning_up = rsi > prev_rsi
         rsi_turning_down = rsi < prev_rsi
 
+        if rsi_turning_up:
+            self.debug_trigger_long += 1
+
+        if rsi_turning_down:
+            self.debug_trigger_short += 1
+
         # -------------------------
-        # LONG
+        # FINAL LONG
         # -------------------------
 
         if trend_up and bullish_pullback and rsi_turning_up:
+
+            self.debug_final_long += 1
+
             return 1
 
         # -------------------------
-        # SHORT
+        # FINAL SHORT
         # -------------------------
 
         if trend_down and bearish_pullback and rsi_turning_down:
+
+            self.debug_final_short += 1
+
             return -1
+
+        # -------------------------
+        # DEBUG OUTPUT
+        # -------------------------
+
+        if i == len(df) - 1:
+
+            print("\nDEBUG STRATEGY COUNTS")
+            print("----------------------")
+
+            print("Trend Up:", self.debug_trend_up)
+            print("Trend Down:", self.debug_trend_down)
+
+            print("Bull Pullback:", self.debug_pullback_long)
+            print("Bear Pullback:", self.debug_pullback_short)
+
+            print("RSI Up:", self.debug_trigger_long)
+            print("RSI Down:", self.debug_trigger_short)
+
+            print("Final Long Signals:", self.debug_final_long)
+            print("Final Short Signals:", self.debug_final_short)
 
         return 0
