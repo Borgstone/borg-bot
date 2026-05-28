@@ -27,6 +27,11 @@ class RSITrendV2Strategy:
 
     def generate_signal(self, df, i):
 
+        if i == 200:
+            print(df.columns.tolist())
+            print(df[[f"rsi_{self.period}"]].tail())
+            print(df[[f"sma_{self.trend_period}"]].tail())
+
         # Need enough candles
         if i < self.trend_period:
             return 0
