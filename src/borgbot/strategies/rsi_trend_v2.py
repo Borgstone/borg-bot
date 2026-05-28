@@ -5,85 +5,51 @@ from .base import Strategy
 
 class RSITrendV2Strategy(Strategy):
 
-    def generate_signal(self, df, i) -> float:
+    def generate_signal(self, df, i):
 
-        candles = context["candles"]
-        closes = candles["close"]
+        if i < self.trend_period:
+            return 0
 
-        # === CONFIG
-        period = self.config.get("period", 14)
-        trend_period = self.config.get("trend_period", 50)
+        price = df["close"].iloc[i]
 
-        pullback_low = self.config.get("pullback_low", 35)
-        pullback_high = self.config.get("pullback_high", 65)
+        sma = df[f"sma_{self.trend_period}"].iloc[i]
 
-        # === INDICATORS
-        rsi_series = rsi(closes, period)
+        rsi = df[f"rsi_{self.period}"].iloc[i]
+        prev_rsi = df[f"rsi_{self.period}"].iloc[i - 1]
 
-        if len(rsi_series) < 2:
-            return 0.0
+        # -------------------------
+        # CONTEXT LAYER
+        # -------------------------
 
-        rsi_now = rsi_series.iloc[-1]
-        rsi_prev = rsi_series.iloc[-2]
+        trend_up = price > sma
+        trend_down = price < sma
 
-        sma_col = f"sma_{trend_period}"
-        if sma_col not in candles:
-            return 0.0
+        # -------------------------
+        # SETUP LAYER
+        # -------------------------
 
-        sma_series = candles[sma_col]
-        if len(sma_series) < trend_period:
-            return 0.0
+        bullish_pullback = rsi < 50
+        bearish_pullback = rsi > 50
 
-        trend_value = sma_series.iloc[-1]
-        price = closes.iloc[-1]
+        # -------------------------
+        # TRIGGER LAYER
+        # -------------------------
 
-        # === SAFETY
-        if trend_value != trend_value:  # NaN
-            return 0.0
+        rsi_turning_up = rsi > prev_rsi
+        rsi_turning_down = rsi < prev_rsi
 
-        # =========================
-        # 🟢 CONTEXT LAYER (TREND)
-        # =========================
-        if price > trend_value:
-            trend = "up"
-        elif price < trend_value:
-            trend = "down"
-        else:
-            return 0.0
+        # -------------------------
+        # LONG
+        # -------------------------
 
-        # =========================
-        # 🔵 SETUP LAYER (PULLBACK)
-        # =========================
-        setup_long = (
-            trend == "up" and
-            rsi_now < pullback_low
-        )
+        if trend_up and bullish_pullback and rsi_turning_up:
+            return 1
 
-        setup_short = (
-            trend == "down" and
-            rsi_now > pullback_high
-        )
+        # -------------------------
+        # SHORT
+        # -------------------------
 
-        # =========================
-        # 🟡 TRIGGER LAYER (TURN)
-        # =========================
-        trigger_long = (
-            setup_long and
-            rsi_now > rsi_prev  # RSI turning up
-        )
+        if trend_down and bearish_pullback and rsi_turning_down:
+            return -1
 
-        trigger_short = (
-            setup_short and
-            rsi_now < rsi_prev  # RSI turning down
-        )
-
-        # =========================
-        # 🎯 DECISION
-        # =========================
-        if trigger_long:
-            return 1.0
-
-        if trigger_short:
-            return -1.0
-
-        return 0.0
+    return 0
