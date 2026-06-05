@@ -39,7 +39,16 @@ class BacktestEngine:
 
         equity = 1.0
         equity_curve = []
-        signal_count = 0
+
+        trade_count = 0
+
+        winning_trades = 0
+        losing_trades = 0
+
+        gross_profit = 0.0
+        gross_loss = 0.0
+
+        trade_returns = []
 
         for i in range(len(df)):
             row = df.iloc[i]
@@ -104,7 +113,19 @@ class BacktestEngine:
                         exit_reason = True
 
                     if exit_reason:
+
                         pnl = (price / entry_price) - 1
+
+                        trade_count += 1
+                        trade_returns.append(pnl)
+
+                        if pnl > 0:
+                            winning_trades += 1
+                            gross_profit += pnl
+                        else:
+                            losing_trades += 1
+                            gross_loss += abs(pnl)
+
                         equity *= (1 + pnl)
 
                         position = 0
@@ -127,19 +148,71 @@ class BacktestEngine:
                         exit_reason = True
 
                     if exit_reason:
+
                         pnl = (entry_price / price) - 1
+
+                        trade_count += 1
+                        trade_returns.append(pnl)
+
+                        if pnl > 0:
+                            winning_trades += 1
+                            gross_profit += pnl
+                        else:
+                            losing_trades += 1
+                            gross_loss += abs(pnl)
+
                         equity *= (1 + pnl)
 
                         position = 0
 
             equity_curve.append(equity)
-        print(f"DEBUG: Total signals = {signal_count}")
+
+        print(f"DEBUG: Signals = {signal_count}")
+        print(f"DEBUG: Trades = {trade_count}")
+        print(f"DEBUG: Win Rate = {win_rate:.2f}%")
+        print(f"DEBUG: Profit Factor = {profit_factor:.2f}")
+
         roi_pct = (equity - 1.0) * 100
+
+        # ---------------------------
+        # METRICS
+        # ---------------------------
+
+        running_peak = -float("inf")
+        max_drawdown = 0.0
+
+        for value in equity_curve:
+
+            running_peak = max(running_peak, value)
+
+            drawdown = (running_peak - value) / running_peak
+
+            max_drawdown = max(max_drawdown, drawdown)
+
+        if trade_count > 0:
+            win_rate = (winning_trades / trade_count) * 100
+            avg_trade = (sum(trade_returns) / trade_count) * 100
+        else:
+            win_rate = 0.0
+            avg_trade = 0.0
+
+        if gross_loss > 0:
+            profit_factor = gross_profit / gross_loss
+        else:
+            profit_factor = 999.0
 
         return {
             "equity_curve": equity_curve,
             "final_equity": equity,
+
             "roi_pct": roi_pct,
-            "trades": signal_count,
-            "max_drawdown": 0.0,
+
+            "trades": trade_count,
+
+            "win_rate": win_rate,
+            "avg_trade": avg_trade,
+
+            "profit_factor": profit_factor,
+
+            "max_drawdown": max_drawdown,
         }
