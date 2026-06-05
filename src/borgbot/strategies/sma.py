@@ -1,25 +1,29 @@
 from borgbot.strategies.base import Strategy
-from borgbot.indicators.sma import sma
 
 
 class SMAStrategy(Strategy):
 
     def generate_signal(self, df, i):
 
-        candles = context["candles"]
+        fast_col = f"sma_{self.config['fast']}"
+        slow_col = f"sma_{self.config['slow']}"
 
-        closes = context["candles"]["close"]
+        if fast_col not in df:
+            return 0
 
-        if len(closes) < 30:
-            return 0.0
+        if slow_col not in df:
+            return 0
 
-        fast = sma(closes, self.config["fast"])
-        slow = sma(closes, self.config["slow"])
+        fast = df[fast_col].iloc[i]
+        slow = df[slow_col].iloc[i]
+
+        if fast != fast or slow != slow:
+            return 0
 
         if fast > slow:
-            return 1.0
+            return 1
 
         if fast < slow:
-            return -1.0
+            return -1
 
-        return 0.0
+        return 0
