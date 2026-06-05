@@ -39,15 +39,12 @@ class BacktestEngine:
 
         equity = 1.0
         equity_curve = []
-
+        signal_count = 0
         trade_count = 0
-
         winning_trades = 0
         losing_trades = 0
-
         gross_profit = 0.0
         gross_loss = 0.0
-
         trade_returns = []
 
         for i in range(len(df)):
