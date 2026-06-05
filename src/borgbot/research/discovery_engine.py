@@ -142,17 +142,20 @@ def run_task(config):
         return None
 
     metrics = wf["metrics"]
+
     # 🚨 FILTER BAD STRATEGIES
     if metrics["roi_std"] > 50:
         return None
 
-    # 🚨 FILTER NO-TRADE STRATEGIES
-    if metrics.get("trades", 0) == 0:
-        return None
+    # TODO:
+    # trades are not yet aggregated in walkforward metrics
+    # temporarily disable trade filters
 
-    # 🚨 FILTER TOO FEW TRADES
-    if metrics.get("trades", 0) < 5:
-        return None
+    # if metrics.get("trades", 0) == 0:
+    #     return None
+
+    # if metrics.get("trades", 0) < 5:
+    #     return None
 
     score = score_walkforward(metrics, mode=SCORING_MODE)
 
