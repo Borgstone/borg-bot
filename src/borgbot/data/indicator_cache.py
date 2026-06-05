@@ -10,17 +10,13 @@ def build_indicator_cache(df):
     cache = df.copy()
 
     # Precompute SMAs
-    for period in range(5, 60):
+    for period in range(5, 201):
         cache[f"sma_{period}"] = sma(cache["close"], period)
 
-    for period in [50, 100]:
-        col = f"sma_{period}"
-        if col not in df:
-            df[col] = sma(df["close"], period)
-
     # Precompute RSI
-    cache["rsi_14"] = rsi(cache["close"], 14)
-
+    for period in range(10, 21):
+        cache[f"rsi_{period}"] = rsi(cache["close"], period)
+        
     # Precompute ATR
     cache["atr_14"] = atr(
     cache["high"],

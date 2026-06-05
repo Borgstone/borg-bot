@@ -1,7 +1,4 @@
-from typing import List
+import pandas as pd
 
-def sma(values: List[float], period: int) -> float:
-    if len(values) < period:
-        return 0.0
-
-    return sum(values[-period:]) / period
+def sma(series: pd.Series, period: int) -> pd.Series:
+    return series.rolling(period).mean()

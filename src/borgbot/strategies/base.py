@@ -1,16 +1,15 @@
 from abc import ABC, abstractmethod
-from typing import Dict
 
 class Strategy(ABC):
-    def __init__(self, config: Dict):
-        self.config = config
 
     @abstractmethod
-    def generate_signal(self, context) -> float:
+    def generate_signal(self, df, i):
         """
+        Research/backtest interface.
+
         Returns:
-            +1.0 = strong long
-            -1.0 = strong short
-             0.0 = hold
+            1 = long
+            -1 = short
+            0 = hold
         """
         pass

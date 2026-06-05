@@ -1,45 +1,15 @@
 import numpy as np
 from dateutil.relativedelta import relativedelta
 from borgbot.backtest.engine import BacktestEngine
-from borgbot.strategies.sma import SMAStrategy
-from borgbot.strategies.rsi import RSIStrategy
-from borgbot.strategies.stack import StrategyStack
 from borgbot.strategies.rsi_trend_v2 import RSITrendV2Strategy 
-
+# Legacy strategies (Session 2 archive)
+# from borgbot.strategies.sma import SMAStrategy
+# from borgbot.strategies.rsi import RSIStrategy
+# from borgbot.strategies.stack import StrategyStack
 
 def build_strategy(config):
 
-    strategy_type = config["type"]
-
-    # -------------------------
-    # SMA
-    # -------------------------
-
-    if strategy_type == "sma":
-
-        return SMAStrategy({
-            "fast": config["fast"],
-            "slow": config["slow"],
-        })
-
-    # -------------------------
-    # RSI
-    # -------------------------
-
-    elif strategy_type == "rsi":
-
-        return RSIStrategy({
-            "period": config["period"],
-            "overbought": config.get("overbought", 70),
-            "oversold": config.get("oversold", 30),
-            "trend_period": config.get("trend_period", 50),
-        })
-
-    # -------------------------
-    # RSI TREND V2
-    # -------------------------
-
-    elif strategy_type == "rsi_trend_v2":
+    if config["type"] == "rsi_trend_v2":
 
         return RSITrendV2Strategy({
             "period": config["period"],
@@ -48,29 +18,9 @@ def build_strategy(config):
             "trend_period": config["trend_period"],
         })
 
-    # -------------------------
-    # SMA + RSI STACK
-    # -------------------------
-
-    elif strategy_type == "sma_rsi":
-
-        return StrategyStack([
-            (
-                SMAStrategy({
-                    "fast": config["fast"],
-                    "slow": config["slow"],
-                }),
-                0.5,
-            ),
-            (
-                RSIStrategy({
-                    "period": config["period"],
-                }),
-                0.5,
-            ),
-        ])
-
-    raise ValueError(f"Unknown strategy type: {strategy_type}")
+    raise ValueError(
+        f"Unsupported strategy type: {config['type']}"
+    )
 
 def generate_grid(config):
     configs = []

@@ -1,4 +1,6 @@
-class RSITrendV2Strategy:
+from borgbot.strategies.base import Strategy
+
+class RSITrendV2Strategy(Strategy):
 
     def __init__(self, config):
 
