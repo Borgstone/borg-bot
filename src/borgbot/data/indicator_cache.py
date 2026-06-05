@@ -9,20 +9,36 @@ def build_indicator_cache(df):
 
     cache = df.copy()
 
-    # Precompute SMAs
-    for period in range(5, 201):
-        cache[f"sma_{period}"] = sma(cache["close"], period)
+    sma_cols = {
+        f"sma_{period}": sma(cache["close"], period)
+        for period in range(5, 201)
+    }
 
-    # Precompute RSI
-    for period in range(10, 21):
-        cache[f"rsi_{period}"] = rsi(cache["close"], period)
-        
-    # Precompute ATR
-    cache["atr_14"] = atr(
-    cache["high"],
-    cache["low"],
-    cache["close"],
-    14,
+    rsi_cols = {
+        f"rsi_{period}": rsi(cache["close"], period)
+        for period in range(10, 21)
+    }
+
+    atr_col = {
+        "atr_14": atr(
+            cache["high"],
+            cache["low"],
+            cache["close"],
+            14,
+        )
+    }
+
+    indicators = pd.DataFrame(
+        {
+            **sma_cols,
+            **rsi_cols,
+            **atr_col,
+        }
+    )
+
+    cache = pd.concat(
+        [cache, indicators],
+        axis=1,
     )
 
     return cache

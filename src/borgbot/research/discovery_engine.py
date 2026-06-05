@@ -143,7 +143,7 @@ def run_task(config):
 
     metrics = wf["metrics"]
     # 🚨 FILTER BAD STRATEGIES
-    if metrics["roi_std"] > 10:
+    if metrics["roi_std"] > 50:
         return None
 
     # 🚨 FILTER NO-TRADE STRATEGIES
