@@ -164,11 +164,6 @@ class BacktestEngine:
 
             equity_curve.append(equity)
 
-        print(f"DEBUG: Signals = {signal_count}")
-        print(f"DEBUG: Trades = {trade_count}")
-        print(f"DEBUG: Win Rate = {win_rate:.2f}%")
-        print(f"DEBUG: Profit Factor = {profit_factor:.2f}")
-
         roi_pct = (equity - 1.0) * 100
 
         # ---------------------------
@@ -197,6 +192,11 @@ class BacktestEngine:
             profit_factor = gross_profit / gross_loss
         else:
             profit_factor = 999.0
+
+        print(f"DEBUG: Signals = {signal_count}")
+        print(f"DEBUG: Trades = {trade_count}")
+        print(f"DEBUG: Win Rate = {win_rate:.2f}%")
+        print(f"DEBUG: Profit Factor = {profit_factor:.2f}")
 
         return {
             "equity_curve": equity_curve,
