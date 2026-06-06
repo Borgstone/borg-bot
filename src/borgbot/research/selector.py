@@ -1,9 +1,9 @@
 def select_strategies(
     results,
     top_n=5,
-    min_roi=0.0,
-    max_std=50.0,
-    max_dd=0.50,
+    min_roi=2.0,
+    max_std=20.0,
+    max_dd=0.30,
 ):
 
     filtered = []

@@ -107,24 +107,21 @@ def score_result(roi, drawdown):
 # SINGLE RUN
 # ---------------------------
 def score_walkforward(metrics, mode="balanced"):
+
     roi = metrics["roi_median"]
     dd = metrics["drawdown_max"]
     std = metrics["roi_std"]
 
-    # Normalize components
-    dd_penalty = dd * 50        # was 100
-    std_penalty = std * 2       # was 25 (WAY too aggressive)
-
     if mode == "conservative":
-        return roi - (dd * 100) - (std * 5)
+        return roi - (dd * 40) - (std * 0.5)
 
     elif mode == "balanced":
-        return roi - dd_penalty - std_penalty
+        return roi - (dd * 25) - (std * 0.25)
 
     elif mode == "aggressive":
-        return roi - (dd * 25) - (std * 1)
+        return roi - (dd * 10) - (std * 0.10)
 
-    return roi - dd_penalty - std_penalty
+    return roi - (dd * 25) - (std * 0.25)
 
 
 def run_task(config):
