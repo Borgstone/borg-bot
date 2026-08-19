@@ -110,18 +110,34 @@ def score_walkforward(metrics, mode="balanced"):
 
     roi = metrics["roi_median"]
     dd = metrics["drawdown_max"]
-    std = metrics["roi_std"]
 
-    if mode == "conservative":
-        return roi - (dd * 40) - (std * 0.5)
+    profit_factor = metrics.get(
+        "profit_factor_mean",
+        0.0,
+    )
 
-    elif mode == "balanced":
-        return roi - (dd * 25) - (std * 0.25)
+    win_rate = metrics.get(
+        "win_rate_mean",
+        0.0,
+    )
 
-    elif mode == "aggressive":
-        return roi - (dd * 10) - (std * 0.10)
+    trades = metrics.get(
+        "trades",
+        0,
+    )
 
-    return roi - (dd * 25) - (std * 0.25)
+    # quality multiplier
+    quality = (
+        (profit_factor * 0.6)
+        + ((win_rate / 100.0) * 0.4)
+    )
+
+    # still keep DD filter influence
+    dd_penalty = 1.0 - min(dd, 0.90)
+
+    score = roi * quality * dd_penalty
+
+    return score
 
 
 def run_task(config):
@@ -194,7 +210,7 @@ def save_results(rows, symbol, timeframe):
 
     for r in rows:
         cur.execute(
-            "INSERT INTO discovery_results VALUES (?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO discovery_results VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 experiment_id,
                 timestamp,
