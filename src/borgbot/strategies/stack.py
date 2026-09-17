@@ -1,16 +1,24 @@
-class StrategyStack:
+from borgbot.strategies.base import Strategy
+
+
+class StrategyStack(Strategy):
+
     def __init__(self, strategies):
         """
-        strategies: list of (strategy_instance, weight)
+        strategies:
+            list of (strategy_instance, weight)
         """
         self.strategies = strategies
 
     def generate_signal(self, df, i):
+
         total_score = 0.0
         total_weight = 0.0
 
         for strat, weight in self.strategies:
+
             signal = strat.generate_signal(df, i)
+
             total_score += signal * weight
             total_weight += weight
 
@@ -21,6 +29,8 @@ class StrategyStack:
 
         if score > 0:
             return 1
-        elif score < 0:
+
+        if score < 0:
             return -1
+
         return 0
