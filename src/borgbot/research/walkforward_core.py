@@ -2,6 +2,10 @@ import numpy as np
 from dateutil.relativedelta import relativedelta
 
 from borgbot.backtest.engine import BacktestEngine
+from borgbot.research.metrics import (
+    aggregate_fold_metrics,
+    normalize_backtest_result,
+)
 from borgbot.strategies.registry import build_strategy
 
 
@@ -83,7 +87,10 @@ def generate_grid(config):
     return configs
 
 
-def run_backtest(config, candles):
+def run_backtest(
+    config,
+    candles,
+):
 
     strategy = build_strategy(
         config
@@ -97,118 +104,68 @@ def run_backtest(config, candles):
         candles
     )
 
+    result = normalize_backtest_result(
+        result
+    )
+
     return {
         # -------------------------
         # Equity
         # -------------------------
 
-        "equity_curve": result.get(
-            "equity_curve",
-            [],
-        ),
+        "equity_curve": result[
+            "equity_curve"
+        ],
 
-        "final_equity": float(
-            result.get(
-                "final_equity",
-                1.0,
-            )
-        ),
+        "final_equity": result[
+            "final_equity"
+        ],
 
         # -------------------------
         # Returns
         # -------------------------
 
-        "roi": float(
-            result.get(
-                "roi_pct",
-                result.get(
-                    "roi",
-                    0.0,
-                ),
-            )
-        ),
-
-        # -------------------------
-        # Risk
-        # -------------------------
-
-        "drawdown": float(
-            result.get(
-                "max_drawdown",
-                0.0,
-            )
-        ),
+        "roi": result[
+            "roi"
+        ],
 
         # -------------------------
         # Trade economics
         # -------------------------
 
-        "gross_profit": float(
-            result.get(
-                "gross_profit",
-                0.0,
-            )
-        ),
+        "gross_profit": result[
+            "gross_profit"
+        ],
 
-        "gross_loss": float(
-            result.get(
-                "gross_loss",
-                0.0,
-            )
-        ),
+        "gross_loss": result[
+            "gross_loss"
+        ],
 
-        "winning_trades": int(
-            result.get(
-                "winning_trades",
-                0,
-            )
-        ),
+        "winning_trades": result[
+            "winning_trades"
+        ],
 
-        "losing_trades": int(
-            result.get(
-                "losing_trades",
-                0,
-            )
-        ),
+        "losing_trades": result[
+            "losing_trades"
+        ],
 
-        "trades": int(
-            result.get(
-                "trades",
-                0,
-            )
-        ),
-
-        # -------------------------
-        # Derived trade metrics
-        # -------------------------
-
-        "profit_factor": float(
-            result.get(
-                "profit_factor",
-                0.0,
-            )
-        ),
-
-        "win_rate": float(
-            result.get(
-                "win_rate",
-                0.0,
-            )
-        ),
-
-        "avg_trade": float(
-            result.get(
-                "avg_trade",
-                0.0,
-            )
-        ),
+        "trades": result[
+            "trades"
+        ],
     }
 
 
-def optimize_on_train(config, train_data):
+def optimize_on_train(
+    config,
+    train_data,
+):
 
-    grid = generate_grid(config)
+    grid = generate_grid(
+        config
+    )
 
+    # Legacy research limit.
+    # This will be redesigned separately.
     grid = grid[:10]
 
     best = None
@@ -237,291 +194,6 @@ def optimize_on_train(config, train_data):
     return best
 
 
-def _calculate_max_drawdown(
-    equity_curve
-):
-
-    if not equity_curve:
-        return 0.0
-
-    running_peak = equity_curve[0]
-    max_drawdown = 0.0
-
-    for value in equity_curve:
-
-        running_peak = max(
-            running_peak,
-            value,
-        )
-
-        if running_peak <= 0:
-            continue
-
-        drawdown = (
-            running_peak - value
-        ) / running_peak
-
-        max_drawdown = max(
-            max_drawdown,
-            drawdown,
-        )
-
-    return max_drawdown
-
-
-def aggregate_fold_metrics(folds):
-    """
-    Aggregate walk-forward test folds using the actual
-    underlying trade and equity data.
-
-    Important:
-    - ROI mean/median/std remain descriptive statistics.
-    - ROI compounded represents sequential out-of-sample
-      capital growth across the folds.
-    - Profit factor is calculated from aggregate gross
-      profit / aggregate gross loss.
-    - Win rate is aggregate wins / aggregate trades.
-    - Average trade is aggregate net trade return /
-      aggregate trade count.
-    - Drawdown is calculated from the combined OOS
-      equity curve rather than averaging fold drawdowns.
-    """
-
-    if not folds:
-        raise ValueError(
-            "Cannot aggregate empty fold set"
-        )
-
-    rois = [
-        fold["roi"]
-        for fold in folds
-    ]
-
-    # -------------------------
-    # Sequential OOS equity
-    # -------------------------
-
-    compounded_equity = 1.0
-
-    combined_equity_curve = []
-
-    for fold in folds:
-
-        fold_curve = fold.get(
-            "equity_curve",
-            [],
-        )
-
-        for value in fold_curve:
-
-            combined_equity_curve.append(
-                compounded_equity
-                * value
-            )
-
-        compounded_equity *= (
-            fold["final_equity"]
-        )
-
-    # -------------------------
-    # Trade-level aggregates
-    # -------------------------
-
-    gross_profit = sum(
-        fold.get(
-            "gross_profit",
-            0.0,
-        )
-        for fold in folds
-    )
-
-    gross_loss = sum(
-        fold.get(
-            "gross_loss",
-            0.0,
-        )
-        for fold in folds
-    )
-
-    winning_trades = sum(
-        fold.get(
-            "winning_trades",
-            0,
-        )
-        for fold in folds
-    )
-
-    losing_trades = sum(
-        fold.get(
-            "losing_trades",
-            0,
-        )
-        for fold in folds
-    )
-
-    trades = sum(
-        fold.get(
-            "trades",
-            0,
-        )
-        for fold in folds
-    )
-
-    # -------------------------
-    # Aggregate PF
-    # -------------------------
-
-    if gross_loss > 0:
-
-        profit_factor = (
-            gross_profit
-            / gross_loss
-        )
-
-    elif gross_profit > 0:
-
-        profit_factor = 999.0
-
-    else:
-
-        profit_factor = 0.0
-
-    # -------------------------
-    # Aggregate win rate
-    # -------------------------
-
-    if trades > 0:
-
-        win_rate = (
-            winning_trades
-            / trades
-        ) * 100.0
-
-        avg_trade = (
-            (
-                gross_profit
-                - gross_loss
-            )
-            / trades
-        ) * 100.0
-
-    else:
-
-        win_rate = 0.0
-        avg_trade = 0.0
-
-    # -------------------------
-    # Aggregate ROI
-    # -------------------------
-
-    roi_compounded = (
-        (compounded_equity - 1.0)
-        * 100.0
-    )
-
-    # -------------------------
-    # Aggregate drawdown
-    # -------------------------
-
-    drawdown_max = (
-        _calculate_max_drawdown(
-            combined_equity_curve
-        )
-    )
-
-    # -------------------------
-    # Fold-level statistics
-    # -------------------------
-
-    roi_mean = float(
-        np.mean(rois)
-    )
-
-    roi_median = float(
-        np.median(rois)
-    )
-
-    roi_std = float(
-        np.std(rois)
-    )
-
-    return {
-        # Descriptive fold statistics.
-        "roi_mean": roi_mean,
-        "roi_median": roi_median,
-        "roi_std": roi_std,
-
-        # Sequential OOS performance.
-        "roi_compounded": float(
-            roi_compounded
-        ),
-
-        # Combined OOS risk.
-        "drawdown_max": float(
-            drawdown_max
-        ),
-
-        # Aggregate trade economics.
-        "profit_factor": float(
-            profit_factor
-        ),
-
-        "win_rate": float(
-            win_rate
-        ),
-
-        "avg_trade": float(
-            avg_trade
-        ),
-
-        "trades": int(
-            trades
-        ),
-
-        "winning_trades": int(
-            winning_trades
-        ),
-
-        "losing_trades": int(
-            losing_trades
-        ),
-
-        "gross_profit": float(
-            gross_profit
-        ),
-
-        "gross_loss": float(
-            gross_loss
-        ),
-
-        "folds": int(
-            len(folds)
-        ),
-
-        # -------------------------
-        # Compatibility aliases
-        # -------------------------
-        #
-        # Keep these names for the
-        # current discovery layer.
-        # Their values are now
-        # correctly aggregated rather
-        # than simple fold averages.
-
-        "profit_factor_mean": float(
-            profit_factor
-        ),
-
-        "win_rate_mean": float(
-            win_rate
-        ),
-
-        "avg_trade_mean": float(
-            avg_trade
-        ),
-    }
-
-
 def run_walkforward(
     config,
     candles,
@@ -529,11 +201,18 @@ def run_walkforward(
     test_months,
 ):
 
-    start = candles["timestamp"].min()
-    end = candles["timestamp"].max()
+    start = candles[
+        "timestamp"
+    ].min()
+
+    end = candles[
+        "timestamp"
+    ].max()
 
     print(
-        candles["timestamp"].head()
+        candles[
+            "timestamp"
+        ].head()
     )
 
     current = start
@@ -546,6 +225,7 @@ def run_walkforward(
 
         fold_count += 1
 
+        # Keep the current VPS validation scope.
         if fold_count > 3:
             break
 
