@@ -34,16 +34,10 @@ def resolve_workers(mode: str) -> int:
         return min(4, cpu)
 
     if mode == "high":
-        return max(
-            1,
-            int(cpu * 0.7),
-        )
+        return max(1, int(cpu * 0.7))
 
     if mode == "max":
-        return max(
-            1,
-            cpu - 1,
-        )
+        return max(1, cpu - 1)
 
     return 1
 
@@ -171,23 +165,16 @@ def run_task(config):
 
 
 # ---------------------------
-# SAVE RESULTS
+# DATABASE SCHEMA
 # ---------------------------
 
-def save_results(
-    rows,
-    symbol,
-    timeframe,
-):
+def ensure_discovery_schema(conn):
+    """
+    Ensure discovery_results has the current schema.
 
-    os.makedirs(
-        "/app/research",
-        exist_ok=True,
-    )
-
-    conn = sqlite3.connect(
-        DB_PATH
-    )
+    Existing databases are migrated in-place by adding any
+    missing columns. Existing research data is preserved.
+    """
 
     cur = conn.cursor()
 
@@ -211,43 +198,122 @@ def save_results(
         """
     )
 
-    experiment_id = str(
-        uuid.uuid4()
-    )[:8]
-
-    timestamp = (
-        datetime.datetime.utcnow()
-        .isoformat()
-    )
-
-    for r in rows:
-
-        cur.execute(
-            """
-            INSERT INTO discovery_results
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
-            """,
-            (
-                experiment_id,
-                timestamp,
-                symbol,
-                timeframe,
-                str(r["config"]),
-
-                r["roi"],
-                r["drawdown"],
-                r["score"],
-                r["roi_std"],
-
-                r["profit_factor"],
-                r["win_rate"],
-                r["avg_trade"],
-                r["trades"],
-            ),
+    existing_columns = {
+        row[1]
+        for row in cur.execute(
+            "PRAGMA table_info(discovery_results)"
         )
+    }
+
+    required_columns = {
+        "experiment_id": "TEXT",
+        "timestamp": "TEXT",
+        "symbol": "TEXT",
+        "timeframe": "TEXT",
+        "config": "TEXT",
+        "roi": "REAL",
+        "drawdown": "REAL",
+        "score": "REAL",
+        "roi_std": "REAL",
+        "profit_factor": "REAL",
+        "win_rate": "REAL",
+        "avg_trade": "REAL",
+        "trades": "INTEGER",
+    }
+
+    for column, column_type in required_columns.items():
+
+        if column not in existing_columns:
+
+            print(
+                f"DB MIGRATION → adding column: {column}"
+            )
+
+            cur.execute(
+                f"ALTER TABLE discovery_results "
+                f"ADD COLUMN {column} {column_type}"
+            )
 
     conn.commit()
-    conn.close()
+
+
+# ---------------------------
+# SAVE RESULTS
+# ---------------------------
+
+def save_results(
+    rows,
+    symbol,
+    timeframe,
+):
+
+    os.makedirs(
+        "/app/research",
+        exist_ok=True,
+    )
+
+    conn = sqlite3.connect(
+        DB_PATH
+    )
+
+    try:
+
+        ensure_discovery_schema(conn)
+
+        cur = conn.cursor()
+
+        experiment_id = str(
+            uuid.uuid4()
+        )[:8]
+
+        timestamp = (
+            datetime.datetime.utcnow()
+            .isoformat()
+        )
+
+        for r in rows:
+
+            cur.execute(
+                """
+                INSERT INTO discovery_results (
+                    experiment_id,
+                    timestamp,
+                    symbol,
+                    timeframe,
+                    config,
+                    roi,
+                    drawdown,
+                    score,
+                    roi_std,
+                    profit_factor,
+                    win_rate,
+                    avg_trade,
+                    trades
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    experiment_id,
+                    timestamp,
+                    symbol,
+                    timeframe,
+                    str(r["config"]),
+                    r["roi"],
+                    r["drawdown"],
+                    r["score"],
+                    r["roi_std"],
+                    r["profit_factor"],
+                    r["win_rate"],
+                    r["avg_trade"],
+                    r["trades"],
+                ),
+            )
+
+        conn.commit()
+
+    finally:
+
+        conn.close()
 
 
 # ---------------------------
