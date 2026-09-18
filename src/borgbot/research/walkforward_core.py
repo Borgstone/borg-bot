@@ -2,6 +2,11 @@ import numpy as np
 from dateutil.relativedelta import relativedelta
 
 from borgbot.backtest.engine import BacktestEngine
+from borgbot.research.horizon import (
+    DEFAULT_HORIZONS,
+    aggregate_horizon_profiles,
+    supported_horizons,
+)
 from borgbot.research.metrics import (
     aggregate_fold_metrics,
     normalize_backtest_result,
@@ -178,13 +183,10 @@ def optimize_on_train(
             train_data,
         )
 
-        score = (
-            result["roi"]
-            - (
-                result["drawdown"]
-                * 100
-            )
-        )
+        # Legacy helper retained for compatibility.
+        # The main discovery pipeline does not currently
+        # use optimize_on_train().
+        score = result["roi"]
 
         if score > best_score:
 
@@ -199,6 +201,7 @@ def run_walkforward(
     candles,
     train_months,
     test_months,
+    timeframe=None,
 ):
 
     start = candles[
@@ -286,6 +289,11 @@ def run_walkforward(
             test,
         )
 
+        result["timestamps"] = (
+            test["timestamp"]
+            .tolist()
+        )
+
         folds.append(
             result
         )
@@ -301,7 +309,27 @@ def run_walkforward(
         folds
     )
 
+    if timeframe is None:
+
+        horizon_list = (
+            DEFAULT_HORIZONS
+        )
+
+    else:
+
+        horizon_list = supported_horizons(
+            timeframe
+        )
+
+    horizon_profile = (
+        aggregate_horizon_profiles(
+            folds,
+            horizons=horizon_list,
+        )
+    )
+
     return {
         "folds": folds,
         "metrics": metrics,
+        "horizon_profile": horizon_profile,
     }
