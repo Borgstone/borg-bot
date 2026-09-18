@@ -17,6 +17,7 @@ SCORING_MODE = "balanced"
 DB_PATH = "/app/research/research.db"
 
 GLOBAL_CANDLES = None
+GLOBAL_TIMEFRAME = None
 
 
 # ---------------------------
@@ -34,10 +35,16 @@ def resolve_workers(mode: str) -> int:
         return min(4, cpu)
 
     if mode == "high":
-        return max(1, int(cpu * 0.7))
+        return max(
+            1,
+            int(cpu * 0.7),
+        )
 
     if mode == "max":
-        return max(1, cpu - 1)
+        return max(
+            1,
+            cpu - 1,
+        )
 
     return 1
 
@@ -46,11 +53,16 @@ def resolve_workers(mode: str) -> int:
 # INIT WORKER
 # ---------------------------
 
-def init_worker(candles):
+def init_worker(
+    candles,
+    timeframe,
+):
 
     global GLOBAL_CANDLES
+    global GLOBAL_TIMEFRAME
 
     GLOBAL_CANDLES = candles
+    GLOBAL_TIMEFRAME = timeframe
 
 
 # ---------------------------
@@ -108,12 +120,14 @@ def run_task(config):
     )
 
     global GLOBAL_CANDLES
+    global GLOBAL_TIMEFRAME
 
     wf = run_walkforward(
         config=config,
         candles=GLOBAL_CANDLES,
         train_months=12,
         test_months=3,
+        timeframe=GLOBAL_TIMEFRAME,
     )
 
     if wf is None:
@@ -134,31 +148,42 @@ def run_task(config):
     return {
         "config": config,
 
+        # Current selector compatibility.
+        # "roi" remains the fold median.
         "roi": metrics["roi_median"],
 
         "drawdown": metrics["drawdown_max"],
 
         "roi_std": metrics["roi_std"],
 
-        "profit_factor": metrics.get(
-            "profit_factor_mean",
-            0.0,
-        ),
+        # Explicit return views.
+        "roi_mean": metrics["roi_mean"],
+        "roi_median": metrics["roi_median"],
+        "roi_compounded": metrics["roi_compounded"],
 
-        "win_rate": metrics.get(
-            "win_rate_mean",
-            0.0,
-        ),
+        # Aggregate trade economics.
+        "profit_factor": metrics["profit_factor"],
+        "win_rate": metrics["win_rate"],
+        "avg_trade": metrics["avg_trade"],
 
-        "avg_trade": metrics.get(
-            "avg_trade_mean",
-            0.0,
-        ),
+        "trades": metrics["trades"],
+        "winning_trades": metrics["winning_trades"],
+        "losing_trades": metrics["losing_trades"],
 
-        "trades": metrics.get(
-            "trades",
-            0,
-        ),
+        "gross_profit": metrics["gross_profit"],
+        "gross_loss": metrics["gross_loss"],
+
+        # Consistency.
+        "folds": metrics["folds"],
+        "positive_folds": metrics["positive_folds"],
+        "positive_fold_ratio": metrics[
+            "positive_fold_ratio"
+        ],
+
+        # Horizon behavior.
+        "horizon_profile": wf[
+            "horizon_profile"
+        ],
 
         "score": score,
     }
@@ -193,7 +218,18 @@ def ensure_discovery_schema(conn):
             profit_factor REAL,
             win_rate REAL,
             avg_trade REAL,
-            trades INTEGER
+            trades INTEGER,
+            roi_mean REAL,
+            roi_median REAL,
+            roi_compounded REAL,
+            winning_trades INTEGER,
+            losing_trades INTEGER,
+            gross_profit REAL,
+            gross_loss REAL,
+            folds INTEGER,
+            positive_folds INTEGER,
+            positive_fold_ratio REAL,
+            horizon_profile TEXT
         )
         """
     )
@@ -219,6 +255,17 @@ def ensure_discovery_schema(conn):
         "win_rate": "REAL",
         "avg_trade": "REAL",
         "trades": "INTEGER",
+        "roi_mean": "REAL",
+        "roi_median": "REAL",
+        "roi_compounded": "REAL",
+        "winning_trades": "INTEGER",
+        "losing_trades": "INTEGER",
+        "gross_profit": "REAL",
+        "gross_loss": "REAL",
+        "folds": "INTEGER",
+        "positive_folds": "INTEGER",
+        "positive_fold_ratio": "REAL",
+        "horizon_profile": "TEXT",
     }
 
     for column, column_type in required_columns.items():
@@ -288,9 +335,24 @@ def save_results(
                     profit_factor,
                     win_rate,
                     avg_trade,
-                    trades
+                    trades,
+                    roi_mean,
+                    roi_median,
+                    roi_compounded,
+                    winning_trades,
+                    losing_trades,
+                    gross_profit,
+                    gross_loss,
+                    folds,
+                    positive_folds,
+                    positive_fold_ratio,
+                    horizon_profile
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?, ?
+                )
                 """,
                 (
                     experiment_id,
@@ -306,6 +368,23 @@ def save_results(
                     r["win_rate"],
                     r["avg_trade"],
                     r["trades"],
+                    r["roi_mean"],
+                    r["roi_median"],
+                    r["roi_compounded"],
+                    r["winning_trades"],
+                    r["losing_trades"],
+                    r["gross_profit"],
+                    r["gross_loss"],
+                    r["folds"],
+                    r["positive_folds"],
+                    r["positive_fold_ratio"],
+                    json.dumps(
+                        r["horizon_profile"],
+                        separators=(
+                            ",",
+                            ":",
+                        ),
+                    ),
                 ),
             )
 
@@ -314,6 +393,69 @@ def save_results(
     finally:
 
         conn.close()
+
+
+# ---------------------------
+# OUTPUT
+# ---------------------------
+
+def print_horizon_profile(
+    profile,
+):
+
+    if not profile:
+        return
+
+    print(
+        "
+Deployment horizon profile:"
+    )
+
+    for horizon, metrics in profile.items():
+
+        observations = metrics[
+            "observations"
+        ]
+
+        if observations == 0:
+
+            print(
+                f"  {horizon}: "
+                "no observations"
+            )
+
+            continue
+
+        print(
+            f"  {horizon}: "
+            f"median {metrics['median_return_pct']:+.2f}% | "
+            f"mean {metrics['mean_return_pct']:+.2f}% | "
+            f"positive {metrics['positive_window_ratio'] * 100:.1f}% | "
+            f"best {metrics['best_return_pct']:+.2f}% | "
+            f"worst {metrics['worst_return_pct']:+.2f}% | "
+            f"n={observations}"
+        )
+
+
+def print_strategy(
+    r,
+):
+
+    print(
+        f"{r['config']} "
+        f"ROI median {r['roi_median']:.2f}% "
+        f"ROI mean {r['roi_mean']:.2f}% "
+        f"ROI compounded {r['roi_compounded']:.2f}% "
+        f"DD {r['drawdown']:.2f} "
+        f"STD {r['roi_std']:.2f} "
+        f"PF {r['profit_factor']:.2f} "
+        f"WR {r['win_rate']:.2f}% "
+        f"AvgTrade {r['avg_trade']:.3f}% "
+        f"Trades {r['trades']} "
+        f"PositiveFolds "
+        f"{r['positive_folds']}/{r['folds']} "
+        f"Score {r['score']:.2f}"
+    )
 
 
 # ---------------------------
@@ -409,7 +551,10 @@ def main():
 
     if workers == 1:
 
-        init_worker(candles)
+        init_worker(
+            candles,
+            args.tf,
+        )
 
         results = [
             run_task(config)
@@ -421,7 +566,10 @@ def main():
         with Pool(
             workers,
             initializer=init_worker,
-            initargs=(candles,),
+            initargs=(
+                candles,
+                args.tf,
+            ),
         ) as pool:
 
             results = pool.map(
@@ -458,15 +606,10 @@ def main():
 
     for r in selected:
 
-        print(
-            f"{r['config']} "
-            f"ROI {r['roi']:.2f}% "
-            f"DD {r['drawdown']:.2f} "
-            f"STD {r['roi_std']:.2f} "
-            f"PF {r['profit_factor']:.2f} "
-            f"WR {r['win_rate']:.2f}% "
-            f"Trades {r['trades']} "
-            f"Score {r['score']:.2f}"
+        print_strategy(r)
+
+        print_horizon_profile(
+            r["horizon_profile"]
         )
 
     # -------------------------
@@ -494,16 +637,11 @@ def main():
 
     for r in results[:10]:
 
-        print(
-            f"{r['config']} "
-            f"ROI {r['roi']:.2f}% "
-            f"DD {r['drawdown']:.2f} "
-            f"STD {r['roi_std']:.2f} "
-            f"PF {r['profit_factor']:.2f} "
-            f"WR {r['win_rate']:.2f}% "
-            f"Trades {r['trades']} "
-            f"Score {r['score']:.2f}"
-        )
+        print_strategy(r)
+
+    # -------------------------
+    # SAVE
+    # -------------------------
 
     save_results(
         results,
