@@ -137,6 +137,7 @@ class BacktestEngine:
             return {
                 "equity_curve": [],
                 "final_equity": 1.0,
+                "roi": 0.0,
                 "roi_pct": 0.0,
                 "trades": 0,
                 "winning_trades": 0,
@@ -522,6 +523,8 @@ class BacktestEngine:
 
             "final_equity": realized_equity,
 
+            "roi": roi_pct,
+            # Backward-compatible alias for older callers.
             "roi_pct": roi_pct,
 
             "trades": trade_count,
