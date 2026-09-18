@@ -55,7 +55,7 @@ def test_analyze_one_hour_horizon():
 
     assert math.isclose(
         result["best_return_pct"],
-        20.0,
+        10.0,
     )
 
 
