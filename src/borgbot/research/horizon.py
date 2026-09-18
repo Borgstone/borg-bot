@@ -1,4 +1,5 @@
 import math
+import re
 from typing import Dict, Iterable, List
 
 import numpy as np
@@ -28,10 +29,32 @@ def horizon_to_timedelta(
         30d ~= one month
         60d ~= two months
         90d ~= three months
+
+    The day suffix is normalized to the non-deprecated pandas
+    unit spelling to keep logs and tests warning-free.
     """
 
+    if not isinstance(horizon, str):
+        raise ValueError(
+            f"Unsupported horizon: {horizon!r}"
+        )
+
+    normalized = horizon.strip().lower()
+
+    match = re.fullmatch(
+        r"(\d+)([a-z]+)",
+        normalized,
+    )
+
+    if match and match.group(2) == "d":
+        normalized = (
+            f"{match.group(1)}D"
+        )
+
     try:
-        delta = pd.Timedelta(horizon)
+        delta = pd.Timedelta(
+            normalized
+        )
     except ValueError as exc:
         raise ValueError(
             f"Unsupported horizon: {horizon!r}"
@@ -65,9 +88,9 @@ def timeframe_to_timedelta(
         "6h": "6h",
         "8h": "8h",
         "12h": "12h",
-        "1d": "1d",
-        "3d": "3d",
-        "1w": "7d",
+        "1d": "1D",
+        "3d": "3D",
+        "1w": "7D",
     }
 
     normalized = aliases.get(
