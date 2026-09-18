@@ -8,8 +8,8 @@ from multiprocessing import Pool
 
 from borgbot.data.loader import load_data
 from borgbot.data.indicator_cache import build_indicator_cache
-from borgbot.research.walkforward_core import run_walkforward
 from borgbot.research.selector import select_strategies
+from borgbot.research.walkforward_core import run_walkforward
 
 
 SCORING_MODE = "balanced"
@@ -19,10 +19,6 @@ DB_PATH = "/app/research/research.db"
 GLOBAL_CANDLES = None
 GLOBAL_TIMEFRAME = None
 
-
-# ---------------------------
-# RESOURCE CONTROL
-# ---------------------------
 
 def resolve_workers(mode: str) -> int:
 
@@ -49,10 +45,6 @@ def resolve_workers(mode: str) -> int:
     return 1
 
 
-# ---------------------------
-# INIT WORKER
-# ---------------------------
-
 def init_worker(
     candles,
     timeframe,
@@ -64,10 +56,6 @@ def init_worker(
     GLOBAL_CANDLES = candles
     GLOBAL_TIMEFRAME = timeframe
 
-
-# ---------------------------
-# SCORING
-# ---------------------------
 
 def score_walkforward(
     metrics,
@@ -108,10 +96,6 @@ def score_walkforward(
         - (std * 0.25)
     )
 
-
-# ---------------------------
-# SINGLE RUN
-# ---------------------------
 
 def run_task(config):
 
@@ -189,17 +173,7 @@ def run_task(config):
     }
 
 
-# ---------------------------
-# DATABASE SCHEMA
-# ---------------------------
-
 def ensure_discovery_schema(conn):
-    """
-    Ensure discovery_results has the current schema.
-
-    Existing databases are migrated in-place by adding any
-    missing columns. Existing research data is preserved.
-    """
 
     cur = conn.cursor()
 
@@ -283,10 +257,6 @@ def ensure_discovery_schema(conn):
 
     conn.commit()
 
-
-# ---------------------------
-# SAVE RESULTS
-# ---------------------------
 
 def save_results(
     rows,
@@ -395,10 +365,6 @@ def save_results(
         conn.close()
 
 
-# ---------------------------
-# OUTPUT
-# ---------------------------
-
 def print_horizon_profile(
     profile,
 ):
@@ -406,10 +372,8 @@ def print_horizon_profile(
     if not profile:
         return
 
-    print(
-        "
-Deployment horizon profile:"
-    )
+    print()
+    print("Deployment horizon profile:")
 
     for horizon, metrics in profile.items():
 
@@ -430,9 +394,12 @@ Deployment horizon profile:"
             f"  {horizon}: "
             f"median {metrics['median_return_pct']:+.2f}% | "
             f"mean {metrics['mean_return_pct']:+.2f}% | "
-            f"positive {metrics['positive_window_ratio'] * 100:.1f}% | "
-            f"best {metrics['best_return_pct']:+.2f}% | "
-            f"worst {metrics['worst_return_pct']:+.2f}% | "
+            f"positive "
+            f"{metrics['positive_window_ratio'] * 100:.1f}% | "
+            f"best "
+            f"{metrics['best_return_pct']:+.2f}% | "
+            f"worst "
+            f"{metrics['worst_return_pct']:+.2f}% | "
             f"n={observations}"
         )
 
@@ -457,10 +424,6 @@ def print_strategy(
         f"Score {r['score']:.2f}"
     )
 
-
-# ---------------------------
-# MAIN
-# ---------------------------
 
 def main():
 
@@ -492,10 +455,6 @@ def main():
 
     SCORING_MODE = args.scoring
 
-    # -------------------------
-    # LOAD DATA
-    # -------------------------
-
     candles = load_data(
         symbol=args.symbol,
         timeframe=args.tf,
@@ -506,10 +465,6 @@ def main():
     candles = build_indicator_cache(
         candles
     )
-
-    # -------------------------
-    # PARAMETER SPACE
-    # -------------------------
 
     configs = []
 
@@ -545,10 +500,6 @@ def main():
         f"strategies with {workers} workers\n"
     )
 
-    # -------------------------
-    # EXECUTION
-    # -------------------------
-
     if workers == 1:
 
         init_worker(
@@ -583,18 +534,10 @@ def main():
         if result is not None
     ]
 
-    # -------------------------
-    # SORT
-    # -------------------------
-
     results.sort(
         key=lambda x: x["score"],
         reverse=True,
     )
-
-    # -------------------------
-    # SELECT
-    # -------------------------
 
     selected = select_strategies(
         results
@@ -612,10 +555,6 @@ def main():
             r["horizon_profile"]
         )
 
-    # -------------------------
-    # DEPLOYABLE FILE
-    # -------------------------
-
     with open(
         "/app/research/deployable.json",
         "w",
@@ -627,10 +566,6 @@ def main():
             indent=2,
         )
 
-    # -------------------------
-    # TOP RESULTS
-    # -------------------------
-
     print(
         "\nTop strategies:\n"
     )
@@ -638,10 +573,6 @@ def main():
     for r in results[:10]:
 
         print_strategy(r)
-
-    # -------------------------
-    # SAVE
-    # -------------------------
 
     save_results(
         results,
