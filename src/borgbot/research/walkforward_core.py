@@ -9,6 +9,7 @@ from borgbot.research.horizon import (
 )
 from borgbot.research.metrics import (
     aggregate_fold_metrics,
+    calculate_max_drawdown,
     normalize_backtest_result,
 )
 from borgbot.strategies.registry import build_strategy
@@ -109,6 +110,11 @@ def run_backtest(
         candles
     )
 
+    raw_drawdown = result.get(
+        "max_drawdown",
+        0.0,
+    )
+
     result = normalize_backtest_result(
         result
     )
@@ -127,12 +133,16 @@ def run_backtest(
         ],
 
         # -------------------------
-        # Returns
+        # Returns / risk
         # -------------------------
 
         "roi": result[
             "roi"
         ],
+
+        "drawdown": float(
+            raw_drawdown
+        ),
 
         # -------------------------
         # Trade economics
@@ -183,10 +193,13 @@ def optimize_on_train(
             train_data,
         )
 
-        # Legacy helper retained for compatibility.
-        # The main discovery pipeline does not currently
-        # use optimize_on_train().
-        score = result["roi"]
+        score = (
+            result["roi"]
+            - (
+                result["drawdown"]
+                * 100
+            )
+        )
 
         if score > best_score:
 
