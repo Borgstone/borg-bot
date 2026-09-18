@@ -14,7 +14,11 @@ REQUIRED_BACKTEST_FIELDS = (
 )
 
 
-def _to_float(value: Any, field: str) -> float:
+def _to_float(
+    value: Any,
+    field: str,
+) -> float:
+
     try:
         result = float(value)
     except (TypeError, ValueError) as exc:
@@ -30,15 +34,34 @@ def _to_float(value: Any, field: str) -> float:
     return result
 
 
-def _to_int(value: Any, field: str) -> int:
+def _to_int(
+    value: Any,
+    field: str,
+) -> int:
+
+    if isinstance(value, bool):
+        raise ValueError(
+            f"Invalid integer value for '{field}': {value!r}"
+        )
+
     try:
-        result = int(value)
+        numeric_value = float(value)
     except (TypeError, ValueError) as exc:
         raise ValueError(
             f"Invalid integer value for '{field}': {value!r}"
         ) from exc
 
-    return result
+    if not math.isfinite(numeric_value):
+        raise ValueError(
+            f"Non-finite integer value for '{field}': {value!r}"
+        )
+
+    if not numeric_value.is_integer():
+        raise ValueError(
+            f"Non-integer value for '{field}': {value!r}"
+        )
+
+    return int(numeric_value)
 
 
 def normalize_backtest_result(
@@ -75,13 +98,23 @@ def normalize_backtest_result(
 
     try:
         equity_curve = [
-            _to_float(value, "equity_curve")
+            _to_float(
+                value,
+                "equity_curve",
+            )
             for value in equity_curve
         ]
     except TypeError as exc:
         raise ValueError(
             "equity_curve must be an iterable of numeric values"
         ) from exc
+
+    for value in equity_curve:
+
+        if value <= 0:
+            raise ValueError(
+                "equity_curve values must be > 0"
+            )
 
     final_equity = _to_float(
         result["final_equity"],
@@ -97,6 +130,22 @@ def normalize_backtest_result(
         result["roi"],
         "roi",
     )
+
+    expected_roi = (
+        final_equity - 1.0
+    ) * 100.0
+
+    if not math.isclose(
+        roi,
+        expected_roi,
+        rel_tol=1e-9,
+        abs_tol=1e-9,
+    ):
+        raise ValueError(
+            "ROI/final_equity mismatch: "
+            f"roi={roi}, "
+            f"expected={expected_roi}"
+        )
 
     gross_profit = _to_float(
         result["gross_profit"],
@@ -158,6 +207,22 @@ def normalize_backtest_result(
             f"winning_trades ({winning_trades}) + "
             f"losing_trades ({losing_trades}) != "
             f"trades ({trades})"
+        )
+
+    if (
+        winning_trades == 0
+        and gross_profit != 0
+    ):
+        raise ValueError(
+            "Gross profit exists without winning trades"
+        )
+
+    if (
+        losing_trades == 0
+        and gross_loss != 0
+    ):
+        raise ValueError(
+            "Gross loss exists without losing trades"
         )
 
     return {
@@ -236,6 +301,10 @@ def aggregate_fold_metrics(
     4. Combined OOS risk
        - maximum drawdown
 
+    5. Fold consistency
+       - positive fold count
+       - positive fold ratio
+
     Fold-level PF, win rate and average trade are NOT averaged.
     They are rebuilt from the underlying aggregate trade data.
     """
@@ -259,7 +328,10 @@ def aggregate_fold_metrics(
         for fold in normalized_folds
     ]
 
-    roi_mean = sum(rois) / len(rois)
+    roi_mean = (
+        sum(rois)
+        / len(rois)
+    )
 
     sorted_rois = sorted(rois)
 
@@ -276,10 +348,13 @@ def aggregate_fold_metrics(
 
         roi_median = sorted_rois[middle]
 
-    roi_variance = sum(
-        (roi - roi_mean) ** 2
-        for roi in rois
-    ) / len(rois)
+    roi_variance = (
+        sum(
+            (roi - roi_mean) ** 2
+            for roi in rois
+        )
+        / len(rois)
+    )
 
     roi_std = math.sqrt(
         roi_variance
@@ -410,34 +485,34 @@ def aggregate_fold_metrics(
     )
 
     return {
-        # Descriptive fold statistics.
         "roi_mean": float(
             roi_mean
         ),
+
         "roi_median": float(
             roi_median
         ),
+
         "roi_std": float(
             roi_std
         ),
 
-        # Sequential OOS performance.
         "roi_compounded": float(
             roi_compounded
         ),
 
-        # Combined OOS risk.
         "drawdown_max": float(
             drawdown_max
         ),
 
-        # Aggregate trade economics.
         "profit_factor": float(
             profit_factor
         ),
+
         "win_rate": float(
             win_rate
         ),
+
         "avg_trade": float(
             avg_trade
         ),
@@ -445,9 +520,11 @@ def aggregate_fold_metrics(
         "trades": int(
             trades
         ),
+
         "winning_trades": int(
             winning_trades
         ),
+
         "losing_trades": int(
             losing_trades
         ),
@@ -455,32 +532,32 @@ def aggregate_fold_metrics(
         "gross_profit": float(
             gross_profit
         ),
+
         "gross_loss": float(
             gross_loss
         ),
 
-        # Fold consistency.
         "folds": int(
             len(normalized_folds)
         ),
+
         "positive_folds": int(
             positive_folds
         ),
+
         "positive_fold_ratio": float(
             positive_fold_ratio
         ),
 
         # Compatibility aliases.
-        #
-        # These names are still consumed by the
-        # current discovery layer. They now point
-        # to the correctly aggregated values.
         "profit_factor_mean": float(
             profit_factor
         ),
+
         "win_rate_mean": float(
             win_rate
         ),
+
         "avg_trade_mean": float(
             avg_trade
         ),
