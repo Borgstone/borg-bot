@@ -22,16 +22,12 @@ def horizon_to_timedelta(
     horizon: str,
 ) -> pd.Timedelta:
     """
-    Convert a supported horizon label to a pandas Timedelta.
+    Convert a research horizon label to a pandas Timedelta.
 
-    Calendar months are deliberately represented as fixed-day
-    research horizons:
+    Fixed-day horizons are used for month-scale research:
         30d ~= one month
         60d ~= two months
         90d ~= three months
-
-    This keeps the measurement unambiguous and independent of
-    calendar month length.
     """
 
     try:
@@ -53,8 +49,8 @@ def timeframe_to_timedelta(
     timeframe: str,
 ) -> pd.Timedelta:
     """
-    Convert an exchange timeframe label such as 1m, 5m, 1h
-    into a Timedelta.
+    Convert an exchange timeframe such as 1m, 5m or 1h
+    into a pandas Timedelta.
     """
 
     aliases = {
@@ -101,11 +97,7 @@ def supported_horizons(
     horizons: Iterable[str] = DEFAULT_HORIZONS,
 ) -> List[str]:
     """
-    Return horizons that are at least as long as the source
-    candle timeframe.
-
-    This prevents meaningless measurements such as a 1h horizon
-    against a 4h candle series.
+    Return horizons at least as long as the source timeframe.
     """
 
     candle_delta = timeframe_to_timedelta(
@@ -116,11 +108,10 @@ def supported_horizons(
 
     for horizon in horizons:
 
-        horizon_delta = horizon_to_timedelta(
-            horizon
-        )
-
-        if horizon_delta >= candle_delta:
+        if (
+            horizon_to_timedelta(horizon)
+            >= candle_delta
+        ):
             supported.append(horizon)
 
     return supported
@@ -182,21 +173,16 @@ def _validate_series(
     )
 
 
-def analyze_horizon(
+def rolling_horizon_returns(
     timestamps: Iterable,
     equity_curve: Iterable[float],
     horizon: str,
-) -> Dict[str, float]:
+) -> List[float]:
     """
-    Measure rolling out-of-sample returns over a deployment horizon.
+    Return all rolling returns over the requested elapsed horizon.
 
-    For every possible starting timestamp with a matching future
-    observation, measure:
-
+    For each eligible start:
         equity[t + horizon] / equity[t] - 1
-
-    This describes how the strategy behaves when continuously
-    deployed over that elapsed horizon.
     """
 
     timestamps, equity = _validate_series(
@@ -209,28 +195,22 @@ def analyze_horizon(
     )
 
     if len(timestamps) == 0:
+        return []
 
-        return {
-            "horizon": horizon,
-            "observations": 0,
-            "mean_return_pct": 0.0,
-            "median_return_pct": 0.0,
-            "std_return_pct": 0.0,
-            "positive_window_ratio": 0.0,
-            "best_return_pct": 0.0,
-            "worst_return_pct": 0.0,
-        }
+    horizon_ns = np.timedelta64(
+        delta.value,
+        "ns",
+    )
 
     returns = []
 
-    for i, timestamp in enumerate(timestamps):
+    for i, timestamp in enumerate(
+        timestamps
+    ):
 
         target = (
             timestamp
-            + np.timedelta64(
-                delta.value,
-                "ns",
-            )
+            + horizon_ns
         )
 
         j = np.searchsorted(
@@ -243,13 +223,12 @@ def analyze_horizon(
             break
 
         start_equity = equity[i]
-        end_equity = equity[j]
 
         if start_equity <= 0:
             continue
 
         window_return = (
-            end_equity
+            equity[j]
             / start_equity
         ) - 1.0
 
@@ -259,6 +238,14 @@ def analyze_horizon(
             returns.append(
                 float(window_return)
             )
+
+    return returns
+
+
+def _summarize_returns(
+    returns: List[float],
+    horizon: str,
+) -> Dict:
 
     if not returns:
 
@@ -280,7 +267,9 @@ def analyze_horizon(
 
     return {
         "horizon": horizon,
-        "observations": int(len(values)),
+        "observations": int(
+            len(values)
+        ),
         "mean_return_pct": float(
             np.mean(values) * 100.0
         ),
@@ -302,14 +291,29 @@ def analyze_horizon(
     }
 
 
+def analyze_horizon(
+    timestamps: Iterable,
+    equity_curve: Iterable[float],
+    horizon: str,
+) -> Dict:
+
+    returns = rolling_horizon_returns(
+        timestamps,
+        equity_curve,
+        horizon,
+    )
+
+    return _summarize_returns(
+        returns,
+        horizon,
+    )
+
+
 def analyze_horizon_profile(
     timestamps: Iterable,
     equity_curve: Iterable[float],
     horizons: Iterable[str] = DEFAULT_HORIZONS,
-) -> Dict[str, Dict[str, float]]:
-    """
-    Analyze multiple deployment horizons for one OOS period.
-    """
+) -> Dict[str, Dict]:
 
     return {
         horizon: analyze_horizon(
@@ -326,13 +330,10 @@ def aggregate_horizon_profiles(
     horizons: Iterable[str] = DEFAULT_HORIZONS,
 ) -> Dict[str, Dict]:
     """
-    Aggregate horizon observations across OOS folds.
+    Aggregate rolling deployment-horizon observations across OOS folds.
 
-    Window returns are concatenated across folds rather than
-    averaging fold-level percentages. Each fold remains separately
-    inspectable through fold_profiles.
-
-    Horizon windows never cross fold boundaries.
+    Window returns are concatenated across folds. No horizon window
+    is allowed to cross a walk-forward fold boundary.
     """
 
     if not folds:
@@ -344,17 +345,22 @@ def aggregate_horizon_profiles(
 
     for horizon in horizons:
 
-        fold_profiles = []
         all_returns = []
+        fold_profiles = []
 
         for fold_index, fold in enumerate(
             folds,
             start=1,
         ):
 
-            profile = analyze_horizon(
+            returns = rolling_horizon_returns(
                 fold["timestamps"],
                 fold["equity_curve"],
+                horizon,
+            )
+
+            profile = _summarize_returns(
+                returns,
                 horizon,
             )
 
@@ -364,103 +370,22 @@ def aggregate_horizon_profiles(
                 profile
             )
 
-            # Reconstruct the rolling returns for
-            # aggregate statistics.
-            timestamps, equity = _validate_series(
-                fold["timestamps"],
-                fold["equity_curve"],
+            all_returns.extend(
+                returns
             )
 
-            delta = horizon_to_timedelta(
-                horizon
-            )
-
-            for i, timestamp in enumerate(
-                timestamps
-            ):
-
-                target = (
-                    timestamp
-                    + np.timedelta64(
-                        delta.value,
-                        "ns",
-                    )
-                )
-
-                j = np.searchsorted(
-                    timestamps,
-                    target,
-                    side="left",
-                )
-
-                if j >= len(timestamps):
-                    break
-
-                start_equity = equity[i]
-                end_equity = equity[j]
-
-                if start_equity <= 0:
-                    continue
-
-                window_return = (
-                    end_equity
-                    / start_equity
-                ) - 1.0
-
-                if math.isfinite(
-                    float(window_return)
-                ):
-                    all_returns.append(
-                        float(window_return)
-                    )
-
-        values = np.asarray(
+        aggregate = _summarize_returns(
             all_returns,
-            dtype=float,
+            horizon,
         )
 
-        if len(values) == 0:
+        aggregate["folds"] = len(
+            folds
+        )
 
-            aggregate = {
-                "horizon": horizon,
-                "observations": 0,
-                "mean_return_pct": 0.0,
-                "median_return_pct": 0.0,
-                "std_return_pct": 0.0,
-                "positive_window_ratio": 0.0,
-                "best_return_pct": 0.0,
-                "worst_return_pct": 0.0,
-            }
-
-        else:
-
-            aggregate = {
-                "horizon": horizon,
-                "observations": int(
-                    len(values)
-                ),
-                "mean_return_pct": float(
-                    np.mean(values) * 100.0
-                ),
-                "median_return_pct": float(
-                    np.median(values) * 100.0
-                ),
-                "std_return_pct": float(
-                    np.std(values) * 100.0
-                ),
-                "positive_window_ratio": float(
-                    np.mean(values > 0.0)
-                ),
-                "best_return_pct": float(
-                    np.max(values) * 100.0
-                ),
-                "worst_return_pct": float(
-                    np.min(values) * 100.0
-                ),
-            }
-
-        aggregate["folds"] = len(folds)
-        aggregate["fold_profiles"] = fold_profiles
+        aggregate["fold_profiles"] = (
+            fold_profiles
+        )
 
         result[horizon] = aggregate
 
