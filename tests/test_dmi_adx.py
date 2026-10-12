@@ -81,3 +81,14 @@ def test_input_series_are_not_modified():
     pd.testing.assert_series_equal(high, before[0])
     pd.testing.assert_series_equal(low, before[1])
     pd.testing.assert_series_equal(close, before[2])
+
+
+
+def test_no_directional_movement_produces_zero_adx_not_missing():
+    close = pd.Series(np.full(60, 100.0))
+    high = pd.Series(np.full(60, 101.0))
+    low = pd.Series(np.full(60, 99.0))
+    result = dmi_adx(high, low, close, period=14)
+
+    assert result["adx"].iloc[:27].isna().all()
+    assert (result["adx"].iloc[27:] == 0.0).all()
