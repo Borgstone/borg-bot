@@ -49,7 +49,10 @@ class MarketRegimeDetector:
             period=self.period,
         )
         result["adx_change"] = result["adx"].diff()
-        result["adx_rising"] = result["adx_change"] > 0.0
+        # Preserve unknown during ADX warm-up instead of silently encoding it as False.
+        result["adx_rising"] = pd.Series(pd.NA, index=result.index, dtype="boolean")
+        valid_change = result["adx_change"].notna()
+        result.loc[valid_change, "adx_rising"] = result.loc[valid_change, "adx_change"] > 0.0
         result["regime"] = [
             self._classify(adx, plus_di, minus_di)
             for adx, plus_di, minus_di in zip(
