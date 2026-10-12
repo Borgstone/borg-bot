@@ -74,6 +74,9 @@ def dmi_adx(high, low, close, period: int = 14) -> pd.DataFrame:
     di_sum = plus_di + minus_di
     valid_dx = np.isfinite(di_sum) & (di_sum > 0)
     dx[valid_dx] = 100.0 * np.abs(plus_di[valid_dx] - minus_di[valid_dx]) / di_sum[valid_dx]
+    # No directional movement is a valid zero-strength observation, not missing data.
+    zero_direction = np.isfinite(smoothed_tr) & (smoothed_tr > 0) & np.isfinite(di_sum) & (di_sum == 0)
+    dx[zero_direction] = 0.0
 
     adx = np.full(size, np.nan)
     first_adx = 2 * period - 1
