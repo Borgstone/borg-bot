@@ -6,6 +6,7 @@ from borgbot.core.timeframe_alignment import (
     align_higher_timeframe_regime,
     timeframe_duration,
 )
+from borgbot.core.market_regime import MarketRegimeDetector
 from borgbot.core.market_regime import REGIME_UNKNOWN
 
 
@@ -36,14 +37,16 @@ def test_invalid_timeframe_rejected(value):
 
 def test_higher_candle_is_not_used_before_its_close():
     # Daily candle opens at midnight and is only available at next midnight.
-    base = make_frame("2025-01-01 00:00:00", 50, "1h")
+    base = make_frame("2025-01-04 00:00:00", 50, "1h")
     higher = make_frame("2025-01-01 00:00:00", 4, "1D", step=10.0)
 
-    result = align_higher_timeframe_regime(base, higher, "1h", "1d")
+    result = align_higher_timeframe_regime(
+        base, higher, "1h", "1d", detector=MarketRegimeDetector(period=2)
+    )
 
-    # Hourly candle opened at 22:00 closes at 23:00: Jan 1 daily candle is not closed.
+    # At 23:00 on Jan 4, the Jan 4 daily candle is still open.
     assert result.loc[22, "higher_regime"] == REGIME_UNKNOWN
-    # Hourly candle opened at 23:00 closes exactly at midnight, so Jan 1 daily candle is now usable.
+    # The Jan 4 daily candle becomes available only when the 23:00 hourly bar closes.
     assert result.loc[23, "higher_regime"] != REGIME_UNKNOWN
 
 
