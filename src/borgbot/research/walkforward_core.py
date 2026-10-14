@@ -12,6 +12,11 @@ from borgbot.research.metrics import (
     calculate_max_drawdown,
     normalize_backtest_result,
 )
+from borgbot.research.regime_analysis import (
+    DEFAULT_MIN_REGIME_TRADES,
+    aggregate_regime_profiles,
+    annotate_entry_regimes,
+)
 from borgbot.strategies.registry import build_strategy
 
 
@@ -106,17 +111,18 @@ def run_backtest(
         strategy=strategy
     )
 
-    result = engine.run(
+    raw_result = engine.run(
         candles
     )
 
-    raw_drawdown = result.get(
+    raw_drawdown = raw_result.get(
         "max_drawdown",
         0.0,
     )
+    trade_log = raw_result.get("trade_log", [])
 
     result = normalize_backtest_result(
-        result
+        raw_result
     )
 
     return {
@@ -167,6 +173,8 @@ def run_backtest(
         "trades": result[
             "trades"
         ],
+
+        "trade_log": trade_log,
     }
 
 
@@ -215,6 +223,8 @@ def run_walkforward(
     train_months,
     test_months,
     timeframe=None,
+    context_timeframe=None,
+    regime_min_trades=DEFAULT_MIN_REGIME_TRADES,
 ):
 
     start = candles[
@@ -307,6 +317,12 @@ def run_walkforward(
             .tolist()
         )
 
+        result["regime_trades"] = annotate_entry_regimes(
+            result.get("trade_log", []),
+            test,
+            fold_number=len(folds) + 1,
+        )
+
         folds.append(
             result
         )
@@ -341,8 +357,18 @@ def run_walkforward(
         )
     )
 
+    regime_profile = None
+    if {"local_regime", "higher_regime"}.issubset(candles.columns):
+        regime_profile = aggregate_regime_profiles(
+            folds,
+            min_trades=regime_min_trades,
+        )
+        regime_profile["base_timeframe"] = timeframe
+        regime_profile["higher_timeframe"] = context_timeframe
+
     return {
         "folds": folds,
         "metrics": metrics,
         "horizon_profile": horizon_profile,
+        "regime_profile": regime_profile,
     }

@@ -8,6 +8,7 @@ from multiprocessing import Pool
 
 from borgbot.data.loader import load_data
 from borgbot.data.indicator_cache import build_indicator_cache
+from borgbot.core.context import MarketContext
 from borgbot.research.selector import select_strategies
 from borgbot.research.walkforward_core import run_walkforward
 
@@ -18,6 +19,7 @@ DB_PATH = "/app/research/research.db"
 
 GLOBAL_CANDLES = None
 GLOBAL_TIMEFRAME = None
+GLOBAL_CONTEXT_TIMEFRAME = None
 
 
 def resolve_workers(mode: str) -> int:
@@ -48,13 +50,16 @@ def resolve_workers(mode: str) -> int:
 def init_worker(
     candles,
     timeframe,
+    context_timeframe=None,
 ):
 
     global GLOBAL_CANDLES
     global GLOBAL_TIMEFRAME
+    global GLOBAL_CONTEXT_TIMEFRAME
 
     GLOBAL_CANDLES = candles
     GLOBAL_TIMEFRAME = timeframe
+    GLOBAL_CONTEXT_TIMEFRAME = context_timeframe
 
 
 def score_walkforward(
@@ -112,6 +117,7 @@ def run_task(config):
         train_months=12,
         test_months=3,
         timeframe=GLOBAL_TIMEFRAME,
+        context_timeframe=GLOBAL_CONTEXT_TIMEFRAME,
     )
 
     if wf is None:
@@ -169,6 +175,8 @@ def run_task(config):
             "horizon_profile"
         ],
 
+        "regime_profile": wf.get("regime_profile"),
+
         "score": score,
     }
 
@@ -203,7 +211,8 @@ def ensure_discovery_schema(conn):
             folds INTEGER,
             positive_folds INTEGER,
             positive_fold_ratio REAL,
-            horizon_profile TEXT
+            horizon_profile TEXT,
+            regime_profile TEXT
         )
         """
     )
@@ -240,6 +249,7 @@ def ensure_discovery_schema(conn):
         "positive_folds": "INTEGER",
         "positive_fold_ratio": "REAL",
         "horizon_profile": "TEXT",
+        "regime_profile": "TEXT",
     }
 
     for column, column_type in required_columns.items():
@@ -316,12 +326,13 @@ def save_results(
                     folds,
                     positive_folds,
                     positive_fold_ratio,
-                    horizon_profile
+                    horizon_profile,
+                    regime_profile
                 )
                 VALUES (
                     ?, ?, ?, ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?, ?
+                    ?, ?, ?, ?, ?, ?, ?
                 )
                 """,
                 (
@@ -350,6 +361,13 @@ def save_results(
                     r["positive_fold_ratio"],
                     json.dumps(
                         r["horizon_profile"],
+                        separators=(
+                            ",",
+                            ":",
+                        ),
+                    ),
+                    json.dumps(
+                        r.get("regime_profile"),
                         separators=(
                             ",",
                             ":",
@@ -404,6 +422,35 @@ def print_horizon_profile(
         )
 
 
+def print_regime_profile(profile):
+
+    if not profile or not profile.get("by_regime"):
+        return
+
+    print(
+        "  Regime-conditional trade profile "
+        "(outcomes grouped by entry regime; bucket returns are not additive to total ROI):"
+    )
+
+    for item in profile["by_regime"][:6]:
+        consistency = item["fold_consistency"]
+        sample_note = "" if item["sample_sufficient"] else " [LOW SAMPLE]"
+        print(
+            f"    higher={item['higher_regime']} "
+            f"local={item['local_regime']} "
+            f"n={item['trades']} "
+            f"return={item['compounded_return_pct']:+.2f}% "
+            f"DD={item['max_drawdown_pct']:.2f}% "
+            f"PF={item['profit_factor']:.2f} "
+            f"WR={item['win_rate_pct']:.1f}% "
+            f"avg={item['avg_trade_pct']:+.3f}% "
+            f"positive folds={consistency['positive_folds']}/"
+            f"{consistency['folds_with_trades']} "
+            f"(of {consistency['total_folds']})"
+            f"{sample_note}"
+        )
+
+
 def print_strategy(
     r,
 ):
@@ -445,6 +492,12 @@ def main():
     )
 
     parser.add_argument(
+        "--context-tf",
+        default=None,
+        help="Optional higher timeframe for leakage-safe regime analysis, e.g. 1d for a 1h base timeframe",
+    )
+
+    parser.add_argument(
         "--resources",
         default="low",
     )
@@ -465,6 +518,24 @@ def main():
     candles = build_indicator_cache(
         candles
     )
+
+    if args.context_tf:
+        higher_candles = load_data(
+            symbol=args.symbol,
+            timeframe=args.context_tf,
+            start="2022-01-01",
+            end="2026-01-01",
+        )
+        candles = MarketContext(
+            candles,
+            higher_tf=higher_candles,
+            timeframe=args.tf,
+            higher_timeframe=args.context_tf,
+        ).analyze()
+        print(
+            f"Market regime context enabled: {args.tf} base / "
+            f"{args.context_tf} higher timeframe"
+        )
 
     configs = []
 
@@ -505,6 +576,7 @@ def main():
         init_worker(
             candles,
             args.tf,
+            args.context_tf,
         )
 
         results = [
@@ -520,6 +592,7 @@ def main():
             initargs=(
                 candles,
                 args.tf,
+                args.context_tf,
             ),
         ) as pool:
 
@@ -555,6 +628,10 @@ def main():
             r["horizon_profile"]
         )
 
+        print_regime_profile(
+            r.get("regime_profile")
+        )
+
     with open(
         "/app/research/deployable.json",
         "w",
@@ -573,6 +650,7 @@ def main():
     for r in results[:10]:
 
         print_strategy(r)
+        print_regime_profile(r.get("regime_profile"))
 
     save_results(
         results,

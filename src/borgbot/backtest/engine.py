@@ -1,6 +1,17 @@
 import numpy as np
 
 
+def _candle_timestamp(df, bar_index):
+    """Return the dataset timestamp for a bar (CCXT datasets use candle-open timestamps)."""
+    if "timestamp" not in df.columns or bar_index is None:
+        return None
+    value = df["timestamp"].iloc[bar_index]
+    if value is None:
+        return None
+    isoformat = getattr(value, "isoformat", None)
+    return isoformat() if callable(isoformat) else str(value)
+
+
 class BacktestEngine:
     """
     Backtest engine.
@@ -136,6 +147,7 @@ class BacktestEngine:
         if df.empty:
             return {
                 "equity_curve": [],
+                "trade_log": [],
                 "final_equity": 1.0,
                 "roi": 0.0,
                 "roi_pct": 0.0,
@@ -161,11 +173,14 @@ class BacktestEngine:
         stop_loss = 0.0
         trail_stop = 0.0
         holding = 0
+        entry_bar = None
+        entry_candle_timestamp = None
 
         # Equity from completed trades only.
         realized_equity = 1.0
 
         equity_curve = []
+        trade_log = []
 
         signal_count = 0
 
@@ -176,12 +191,14 @@ class BacktestEngine:
         gross_profit = 0.0
         gross_loss = 0.0
 
-        def close_position(exit_price):
+        def close_position(exit_price, exit_bar=None, exit_candle_timestamp=None):
             nonlocal position
             nonlocal entry_price
             nonlocal stop_loss
             nonlocal trail_stop
             nonlocal holding
+            nonlocal entry_bar
+            nonlocal entry_candle_timestamp
 
             nonlocal realized_equity
 
@@ -226,11 +243,24 @@ class BacktestEngine:
                 1.0 + pnl
             )
 
+            trade_log.append({
+                "entry_bar": entry_bar,
+                "exit_bar": exit_bar,
+                "entry_candle_timestamp": entry_candle_timestamp,
+                "exit_candle_timestamp": exit_candle_timestamp,
+                "side": "long" if position == 1 else "short",
+                "entry_price": float(entry_price),
+                "exit_price": float(exit_price),
+                "pnl_pct": float(pnl * 100.0),
+            })
+
             position = 0
             entry_price = 0.0
             stop_loss = 0.0
             trail_stop = 0.0
             holding = 0
+            entry_bar = None
+            entry_candle_timestamp = None
 
         for i in range(len(df)):
 
@@ -292,6 +322,8 @@ class BacktestEngine:
                     position = 1
                     entry_price = price
                     holding = 0
+                    entry_bar = i
+                    entry_candle_timestamp = _candle_timestamp(df, i)
 
                     stop_loss = (
                         entry_price
@@ -308,6 +340,8 @@ class BacktestEngine:
                     position = -1
                     entry_price = price
                     holding = 0
+                    entry_bar = i
+                    entry_candle_timestamp = _candle_timestamp(df, i)
 
                     stop_loss = (
                         entry_price
@@ -366,7 +400,7 @@ class BacktestEngine:
                         exit_position = True
 
                     if exit_position:
-                        close_position(price)
+                        close_position(price, i, _candle_timestamp(df, i))
 
                 # -----------------------
                 # SHORT
@@ -407,7 +441,7 @@ class BacktestEngine:
                         exit_position = True
 
                     if exit_position:
-                        close_position(price)
+                        close_position(price, i, _candle_timestamp(df, i))
 
             # ---------------------------
             # MARK TO MARKET
@@ -441,7 +475,7 @@ class BacktestEngine:
                 and last_price > 0
             ):
 
-                close_position(last_price)
+                close_position(last_price, len(df) - 1, _candle_timestamp(df, len(df) - 1))
 
                 # Replace the final marked value with the
                 # now-realized equity.
@@ -520,6 +554,10 @@ class BacktestEngine:
 
         return {
             "equity_curve": equity_curve,
+
+            # Detailed outcomes support regime-conditional research without
+            # changing signal generation or aggregate backtest accounting.
+            "trade_log": trade_log,
 
             "final_equity": realized_equity,
 
