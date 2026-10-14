@@ -9,6 +9,7 @@ from multiprocessing import Pool
 from borgbot.data.loader import load_data
 from borgbot.data.indicator_cache import build_indicator_cache
 from borgbot.core.context import MarketContext
+from borgbot.core.timeframe_alignment import timeframe_duration
 from borgbot.research.selector import select_strategies
 from borgbot.research.walkforward_core import run_walkforward
 
@@ -472,6 +473,38 @@ def print_strategy(
     )
 
 
+def validate_context_coverage(
+    base_candles,
+    higher_candles,
+    base_timeframe,
+    higher_timeframe,
+):
+    """Reject higher-timeframe datasets that would silently mislabel OOS folds."""
+    if base_candles.empty:
+        raise ValueError("base timeframe dataset is empty")
+    if higher_candles.empty:
+        raise ValueError("higher-timeframe context dataset is empty")
+
+    base_start = base_candles["timestamp"].min()
+    higher_start = higher_candles["timestamp"].min()
+    if higher_start > base_start:
+        raise ValueError(
+            "higher-timeframe context starts after the base dataset; "
+            "early regime labels would be UNKNOWN"
+        )
+
+    base_last_timestamp = base_candles["timestamp"].max()
+    higher_available_end = (
+        higher_candles["timestamp"].max()
+        + timeframe_duration(higher_timeframe)
+    )
+    if higher_available_end < base_last_timestamp:
+        raise ValueError(
+            "higher-timeframe context ends before the base dataset; "
+            "late regime labels would be stale or unavailable"
+        )
+
+
 def main():
 
     parser = argparse.ArgumentParser()
@@ -520,12 +553,38 @@ def main():
     )
 
     if args.context_tf:
+        context_path = (
+            f"/app/data/{args.symbol.replace('/', '')}_{args.context_tf}.parquet"
+        )
+        if not os.path.exists(context_path):
+            raise FileNotFoundError(
+                f"Missing higher-timeframe dataset: {context_path}. "
+                "Backfill it with: python -m borgbot.data.downloader "
+                f"--symbol {args.symbol} --tf {args.context_tf} "
+                "--start 2022-01-01 --end 2026-01-01"
+            )
+
         higher_candles = load_data(
             symbol=args.symbol,
             timeframe=args.context_tf,
             start="2022-01-01",
             end="2026-01-01",
         )
+        try:
+            validate_context_coverage(
+                candles,
+                higher_candles,
+                args.tf,
+                args.context_tf,
+            )
+        except ValueError as exc:
+            raise ValueError(
+                f"{exc}. Backfill the complete context range with: "
+                "python -m borgbot.data.downloader "
+                f"--symbol {args.symbol} --tf {args.context_tf} "
+                "--start 2022-01-01 --end 2026-01-01"
+            ) from exc
+
         candles = MarketContext(
             candles,
             higher_tf=higher_candles,
