@@ -548,8 +548,10 @@ def main():
         end="2026-01-01",
     )
 
-    candles = build_indicator_cache(
-        candles
+    print(
+        f"Loaded {len(candles):,} {args.symbol} {args.tf} candles "
+        f"from {candles['timestamp'].min()} to {candles['timestamp'].max()}",
+        flush=True,
     )
 
     if args.context_tf:
@@ -593,8 +595,16 @@ def main():
         ).analyze()
         print(
             f"Market regime context enabled: {args.tf} base / "
-            f"{args.context_tf} higher timeframe"
+            f"{args.context_tf} higher timeframe",
+            flush=True,
         )
+
+    print("Building cached indicators...", flush=True)
+    candles = build_indicator_cache(candles)
+    print(
+        f"Indicator cache ready: {len(candles):,} rows × {len(candles.columns):,} columns",
+        flush=True,
+    )
 
     configs = []
 
