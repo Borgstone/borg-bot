@@ -744,7 +744,9 @@ def main():
         )
 
     print("Building cached indicators...", flush=True)
-    candles = build_indicator_cache(candles)
+    # Discovery candidates use only trend_period 50 or 100. Avoid building
+    # the other 194 SMA columns for this 35k-candle research dataset.
+    candles = build_indicator_cache(candles, sma_periods=(50, 100))
     print(
         f"Indicator cache ready: {len(candles):,} rows × {len(candles.columns):,} columns",
         flush=True,
