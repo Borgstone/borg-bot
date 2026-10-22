@@ -53,6 +53,15 @@ class BacktestEngine:
             48,
         )
 
+        # Per-fill assumptions; omitted settings preserve zero-cost behavior.
+        self.fees_bps = float(self.config.get("fees_bps", 0.0))
+        self.slippage_pct = float(self.config.get("slippage_pct", 0.0))
+        if not np.isfinite(self.fees_bps) or not 0.0 <= self.fees_bps < 10_000.0:
+            raise ValueError("fees_bps must be finite and in [0, 10000)")
+        if not np.isfinite(self.slippage_pct) or not 0.0 <= self.slippage_pct < 1.0:
+            raise ValueError("slippage_pct must be finite and in [0, 1)")
+        self.fee_rate = self.fees_bps / 10_000.0
+
     def compute_atr(self, df):
 
         high = df["high"]
@@ -81,6 +90,8 @@ class BacktestEngine:
         position,
         entry_price,
         price,
+        fees_bps=0.0,
+        slippage_pct=0.0,
     ):
         """
         Calculate total equity including the unrealized PnL
@@ -95,19 +106,20 @@ class BacktestEngine:
         if entry_price <= 0 or price <= 0:
             return realized_equity
 
+        fee_rate = float(fees_bps) / 10_000.0
         if position == 1:
-            return (
-                realized_equity
-                * (price / entry_price)
-            )
+            exit_fill_price = price * (1.0 - slippage_pct)
+            price_return = (exit_fill_price / entry_price) - 1.0
+        elif position == -1:
+            exit_fill_price = price * (1.0 + slippage_pct)
+            # At 1x exposure, a 10% price fall produces a 10% short return.
+            price_return = (entry_price - exit_fill_price) / entry_price
+        else:
+            return realized_equity
 
-        if position == -1:
-            return (
-                realized_equity
-                * (entry_price / price)
-            )
-
-        return realized_equity
+        # Include entry fee and hypothetical exit fee in marked equity.
+        net_multiplier = (1.0 + price_return) * ((1.0 - fee_rate) ** 2)
+        return realized_equity * net_multiplier
 
     @staticmethod
     def calculate_max_drawdown(equity_curve):
@@ -215,17 +227,18 @@ class BacktestEngine:
             if exit_price <= 0 or entry_price <= 0:
                 return
 
+            # Apply adverse exit slippage before computing the price return.
             if position == 1:
-
-                pnl = (
-                    exit_price / entry_price
-                ) - 1.0
-
+                exit_fill_price = exit_price * (1.0 - self.slippage_pct)
+                price_return = (exit_fill_price / entry_price) - 1.0
             else:
+                exit_fill_price = exit_price * (1.0 + self.slippage_pct)
+                # Short P&L is symmetric to long P&L for equal percentage moves.
+                price_return = (entry_price - exit_fill_price) / entry_price
 
-                pnl = (
-                    entry_price / exit_price
-                ) - 1.0
+            # Charge a fee on entry and exit. The engine's existing exposure model
+            # compounds each trade against the full current equity.
+            pnl = (1.0 + price_return) * ((1.0 - self.fee_rate) ** 2) - 1.0
 
             trade_count += 1
 
@@ -250,8 +263,11 @@ class BacktestEngine:
                 "exit_candle_timestamp": exit_candle_timestamp,
                 "side": "long" if position == 1 else "short",
                 "entry_price": float(entry_price),
-                "exit_price": float(exit_price),
+                "exit_price": float(exit_fill_price),
+                "pnl_before_fees_pct": float(price_return * 100.0),
                 "pnl_pct": float(pnl * 100.0),
+                "fees_bps_per_side": self.fees_bps,
+                "slippage_pct_per_side": self.slippage_pct,
             })
 
             position = 0
@@ -290,6 +306,8 @@ class BacktestEngine:
                         position,
                         entry_price,
                         price,
+                        fees_bps=self.fees_bps,
+                        slippage_pct=self.slippage_pct,
                     )
                     if np.isfinite(price)
                     else realized_equity
@@ -320,7 +338,7 @@ class BacktestEngine:
                 if signal == 1:
 
                     position = 1
-                    entry_price = price
+                    entry_price = price * (1.0 + self.slippage_pct)
                     holding = 0
                     entry_bar = i
                     entry_candle_timestamp = _candle_timestamp(df, i)
@@ -338,7 +356,7 @@ class BacktestEngine:
                 elif signal == -1:
 
                     position = -1
-                    entry_price = price
+                    entry_price = price * (1.0 - self.slippage_pct)
                     holding = 0
                     entry_bar = i
                     entry_candle_timestamp = _candle_timestamp(df, i)
@@ -453,6 +471,8 @@ class BacktestEngine:
                     position,
                     entry_price,
                     price,
+                    fees_bps=self.fees_bps,
+                    slippage_pct=self.slippage_pct,
                 )
             )
 

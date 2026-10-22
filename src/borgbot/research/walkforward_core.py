@@ -101,6 +101,7 @@ def generate_grid(config):
 def run_backtest(
     config,
     candles,
+    backtest_config=None,
 ):
 
     strategy = build_strategy(
@@ -108,7 +109,8 @@ def run_backtest(
     )
 
     engine = BacktestEngine(
-        strategy=strategy
+        strategy=strategy,
+        config=backtest_config,
     )
 
     raw_result = engine.run(
@@ -225,6 +227,7 @@ def run_walkforward(
     timeframe=None,
     context_timeframe=None,
     regime_min_trades=DEFAULT_MIN_REGIME_TRADES,
+    backtest_config=None,
 ):
 
     start = candles[
@@ -310,6 +313,7 @@ def run_walkforward(
         result = run_backtest(
             config,
             test,
+            backtest_config=backtest_config,
         )
 
         result["timestamps"] = (

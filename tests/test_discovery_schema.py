@@ -3,8 +3,10 @@ import sqlite3
 import pandas as pd
 import pytest
 
+import borgbot.research.discovery_engine as discovery_engine
 from borgbot.research.discovery_engine import (
     ensure_discovery_schema,
+    run_holdout_validation,
     validate_context_coverage,
 )
 
@@ -65,3 +67,56 @@ def test_context_coverage_rejects_higher_timeframe_ending_too_early():
 
     with pytest.raises(ValueError, match="ends before the base dataset"):
         validate_context_coverage(base, higher, "1h", "1d")
+
+
+
+def test_holdout_validation_rejects_overlap_with_discovery_folds():
+    candles = pd.DataFrame({
+        "timestamp": pd.date_range("2023-09-01", periods=100, freq="h"),
+        "local_regime": ["UP"] * 100,
+        "higher_regime": ["UP"] * 100,
+    })
+    with pytest.raises(ValueError, match="does not overlap"):
+        run_holdout_validation(
+            {"type": "rsi_trend_v2", "period": 11, "pullback_low": 40,
+             "pullback_high": 70, "trend_period": 50},
+            candles, "2023-09-01", "1h", "1d",
+        )
+
+
+def test_holdout_validation_runs_on_later_candles_without_reselecting(monkeypatch):
+    candles = pd.DataFrame({
+        "timestamp": pd.date_range("2023-09-30", periods=100, freq="h"),
+        "local_regime": ["SIDEWAYS"] * 100,
+        "higher_regime": ["UP"] * 100,
+    })
+    seen = {}
+
+    def fake_run_backtest(config, data, backtest_config=None):
+        seen["config"] = dict(config)
+        seen["start"] = data["timestamp"].min()
+        seen["rows"] = len(data)
+        seen["backtest_config"] = dict(backtest_config or {})
+        return {
+            "equity_curve": [1.0, 1.05], "final_equity": 1.05, "roi": 5.0,
+            "drawdown": 0.0, "gross_profit": 0.05, "gross_loss": 0.0,
+            "winning_trades": 1, "losing_trades": 0, "trades": 1,
+            "trade_log": [{"entry_bar": 0, "exit_bar": 1, "pnl_pct": 5.0}],
+        }
+
+    monkeypatch.setattr(discovery_engine, "run_backtest", fake_run_backtest)
+    config = {"type": "rsi_trend_v2", "period": 11, "pullback_low": 40,
+              "pullback_high": 70, "trend_period": 50}
+    result = run_holdout_validation(
+        config, candles, "2023-10-01", "1h", "1d",
+        backtest_config={"fees_bps": 10.0, "slippage_pct": 0.0005},
+        min_regime_trades=1,
+    )
+
+    assert seen["config"] == config
+    assert seen["start"] == pd.Timestamp("2023-10-01 00:00:00")
+    assert seen["backtest_config"]["fees_bps"] == 10.0
+    assert seen["rows"] == len(candles) - 1
+    assert result["metrics"]["roi_pct"] == 5.0
+    assert result["regime_profile"]["by_regime"][0]["higher_regime"] == "UP"
+    assert result["regime_profile"]["by_regime"][0]["local_regime"] == "SIDEWAYS"

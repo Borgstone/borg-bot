@@ -6,12 +6,20 @@ import sqlite3
 import uuid
 from multiprocessing import Pool
 
+import pandas as pd
+
 from borgbot.data.loader import load_data
 from borgbot.data.indicator_cache import build_indicator_cache
 from borgbot.core.context import MarketContext
 from borgbot.core.timeframe_alignment import timeframe_duration
+from borgbot.research.metrics import aggregate_fold_metrics
+from borgbot.research.regime_analysis import (
+    DEFAULT_MIN_REGIME_TRADES,
+    aggregate_regime_profiles,
+    annotate_entry_regimes,
+)
 from borgbot.research.selector import select_strategies
-from borgbot.research.walkforward_core import run_walkforward
+from borgbot.research.walkforward_core import run_backtest, run_walkforward
 
 
 SCORING_MODE = "balanced"
@@ -21,6 +29,10 @@ DB_PATH = "/app/research/research.db"
 GLOBAL_CANDLES = None
 GLOBAL_TIMEFRAME = None
 GLOBAL_CONTEXT_TIMEFRAME = None
+GLOBAL_BACKTEST_CONFIG = {}
+
+# The current three development folds end at this exclusive timestamp.
+DISCOVERY_END_EXCLUSIVE = pd.Timestamp("2023-10-01")
 
 
 def resolve_workers(mode: str) -> int:
@@ -52,15 +64,18 @@ def init_worker(
     candles,
     timeframe,
     context_timeframe=None,
+    backtest_config=None,
 ):
 
     global GLOBAL_CANDLES
     global GLOBAL_TIMEFRAME
     global GLOBAL_CONTEXT_TIMEFRAME
+    global GLOBAL_BACKTEST_CONFIG
 
     GLOBAL_CANDLES = candles
     GLOBAL_TIMEFRAME = timeframe
     GLOBAL_CONTEXT_TIMEFRAME = context_timeframe
+    GLOBAL_BACKTEST_CONFIG = dict(backtest_config or {})
 
 
 def score_walkforward(
@@ -119,6 +134,7 @@ def run_task(config):
         test_months=3,
         timeframe=GLOBAL_TIMEFRAME,
         context_timeframe=GLOBAL_CONTEXT_TIMEFRAME,
+        backtest_config=GLOBAL_BACKTEST_CONFIG,
     )
 
     if wf is None:
@@ -505,6 +521,100 @@ def validate_context_coverage(
         )
 
 
+def run_holdout_validation(
+    config,
+    candles,
+    holdout_start,
+    timeframe,
+    higher_timeframe,
+    backtest_config=None,
+    min_regime_trades=DEFAULT_MIN_REGIME_TRADES,
+):
+    """Evaluate one discovery-selected configuration on a later untouched period."""
+    start = pd.Timestamp(holdout_start)
+    if start < DISCOVERY_END_EXCLUSIVE:
+        raise ValueError(
+            f"holdout_start must be on or after {DISCOVERY_END_EXCLUSIVE.date()} "
+            "so it does not overlap the strategy-selection folds"
+        )
+
+    holdout = candles.loc[candles["timestamp"] >= start].copy().reset_index(drop=True)
+    if holdout.empty:
+        raise ValueError(f"holdout period from {start} contains no candles")
+
+    result = run_backtest(config, holdout, backtest_config=backtest_config)
+    metrics = aggregate_fold_metrics([result])
+
+    profile = None
+    if {"local_regime", "higher_regime"}.issubset(holdout.columns):
+        regime_trades = annotate_entry_regimes(
+            result.get("trade_log", []), holdout, fold_number=1
+        )
+        profile = aggregate_regime_profiles(
+            [{"regime_trades": regime_trades}], min_trades=min_regime_trades
+        )
+        profile["base_timeframe"] = timeframe
+        profile["higher_timeframe"] = higher_timeframe
+
+    costs = dict(backtest_config or {})
+    return {
+        "period": {
+            "start": str(holdout["timestamp"].min()),
+            "end": str(holdout["timestamp"].max()),
+            "candles": int(len(holdout)),
+        },
+        "config": dict(config),
+        "execution_assumptions": {
+            "fees_bps_per_side": float(costs.get("fees_bps", 0.0)),
+            "slippage_pct_per_side": float(costs.get("slippage_pct", 0.0)),
+            "exposure_note": (
+                "The research engine assumes all-equity exposure per trade; this is not "
+                "identical to the paper runner's configurable position sizing."
+            ),
+        },
+        "metrics": {
+            "roi_pct": metrics["roi_compounded"],
+            "max_drawdown_pct": metrics["drawdown_max"] * 100.0,
+            "profit_factor": metrics["profit_factor"],
+            "win_rate_pct": metrics["win_rate"],
+            "avg_trade_pct": metrics["avg_trade"],
+            "trades": metrics["trades"],
+            "positive_folds": metrics["positive_folds"],
+            "folds": metrics["folds"],
+        },
+        "regime_profile": profile,
+        "interpretation_note": (
+            "This holdout period begins after the discovery folds and is not used to "
+            "calculate the discovery score or choose the configuration."
+        ),
+    }
+
+
+def print_holdout_validation(validation):
+    period = validation["period"]
+    metrics = validation["metrics"]
+    costs = validation["execution_assumptions"]
+    print("\nIndependent holdout validation (not used for strategy selection):", flush=True)
+    print(
+        f"  Period: {period['start']} to {period['end']} "
+        f"({period['candles']:,} candles)", flush=True
+    )
+    print(
+        f"  Config: {validation['config']}\n"
+        f"  Net ROI: {metrics['roi_pct']:+.2f}% | "
+        f"DD: {metrics['max_drawdown_pct']:.2f}% | "
+        f"PF: {metrics['profit_factor']:.2f} | "
+        f"WR: {metrics['win_rate_pct']:.2f}% | "
+        f"Avg trade: {metrics['avg_trade_pct']:.3f}% | "
+        f"Trades: {metrics['trades']}", flush=True
+    )
+    print(
+        f"  Costs modeled: {costs['fees_bps_per_side']:.1f} bps fees/side; "
+        f"{costs['slippage_pct_per_side'] * 100.0:.3f}% slippage/side", flush=True
+    )
+    print_regime_profile(validation.get("regime_profile"))
+
+
 def main():
 
     parser = argparse.ArgumentParser()
@@ -535,7 +645,36 @@ def main():
         default="low",
     )
 
+    parser.add_argument(
+        "--fees-bps", type=float, default=10.0,
+        help="Fee in basis points per fill (default: 10, matching paper-trader config)",
+    )
+    parser.add_argument(
+        "--slippage-pct", type=float, default=0.0005,
+        help="Adverse slippage fraction per fill (default: 0.0005 = 0.05%)",
+    )
+    parser.add_argument(
+        "--holdout-start", default="2023-10-01",
+        help="Start of untouched validation; must be on/after 2023-10-01",
+    )
+
     args = parser.parse_args()
+
+    if not (0.0 <= args.fees_bps < 10_000.0):
+        parser.error("--fees-bps must be in [0, 10000)")
+    if not (0.0 <= args.slippage_pct < 1.0):
+        parser.error("--slippage-pct must be in [0, 1)")
+    try:
+        parsed_holdout_start = pd.Timestamp(args.holdout_start)
+    except (TypeError, ValueError):
+        parser.error("--holdout-start must be a valid date/timestamp")
+    if parsed_holdout_start < DISCOVERY_END_EXCLUSIVE:
+        parser.error("--holdout-start must be on or after 2023-10-01")
+
+    backtest_config = {
+        "fees_bps": args.fees_bps,
+        "slippage_pct": args.slippage_pct,
+    }
 
     global SCORING_MODE
 
@@ -551,6 +690,11 @@ def main():
     print(
         f"Loaded {len(candles):,} {args.symbol} {args.tf} candles "
         f"from {candles['timestamp'].min()} to {candles['timestamp'].max()}",
+        flush=True,
+    )
+    print(
+        f"Execution assumptions: {args.fees_bps:.1f} bps fee per side; "
+        f"{args.slippage_pct * 100.0:.3f}% slippage per side",
         flush=True,
     )
 
@@ -646,6 +790,7 @@ def main():
             candles,
             args.tf,
             args.context_tf,
+            backtest_config,
         )
 
         results = [
@@ -662,6 +807,7 @@ def main():
                 candles,
                 args.tf,
                 args.context_tf,
+                backtest_config,
             ),
         ) as pool:
 
@@ -726,6 +872,18 @@ def main():
         args.symbol,
         args.tf,
     )
+
+    # Validate the top discovery candidate later; holdout data never affects scoring.
+    candidate = selected[0] if selected else (results[0] if results else None)
+    if candidate is not None:
+        validation = run_holdout_validation(
+            candidate["config"], candles, args.holdout_start, args.tf,
+            args.context_tf, backtest_config=backtest_config,
+        )
+        print_holdout_validation(validation)
+        with open("/app/research/holdout_validation.json", "w") as f:
+            json.dump(validation, f, indent=2)
+        print("\nSaved independent holdout report: /app/research/holdout_validation.json", flush=True)
 
 
 if __name__ == "__main__":
