@@ -275,10 +275,9 @@ def run_walkforward(
         if test_end > end:
             break
 
-        train = candles[
-            candles["timestamp"]
-            < train_end
-        ]
+        # The training frame is not used by the current discovery process;
+        # count its rows without materializing a wide copy of the cached candles.
+        train_count = int((candles["timestamp"] < train_end).sum())
 
         test = candles[
             (
@@ -293,14 +292,14 @@ def run_walkforward(
 
         print(
             f"DEBUG SPLIT → Train: "
-            f"{len(train)} | "
+            f"{train_count} | "
             f"Test: {len(test)} | "
             f"TrainEnd: {train_end} | "
             f"TestEnd: {test_end}"
         )
 
         if (
-            len(train) < 100
+            train_count < 100
             or len(test) < 50
         ):
 
