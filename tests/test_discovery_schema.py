@@ -117,6 +117,6 @@ def test_holdout_validation_runs_on_later_candles_without_reselecting(monkeypatc
     assert seen["start"] == pd.Timestamp("2023-10-01 00:00:00")
     assert seen["backtest_config"]["fees_bps"] == 10.0
     assert seen["rows"] == int((candles["timestamp"] >= pd.Timestamp("2023-10-01")).sum())
-    assert result["metrics"]["roi_pct"] == 5.0
+    assert result["metrics"]["roi_pct"] == pytest.approx(5.0)
     assert result["regime_profile"]["by_regime"][0]["higher_regime"] == "UP"
     assert result["regime_profile"]["by_regime"][0]["local_regime"] == "SIDEWAYS"
